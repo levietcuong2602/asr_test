@@ -57,7 +57,7 @@ VbeeSpeech.prototype.runSendVoice = function () {
 
 const test = new VbeeSpeech();
 
-const audioDataStream = fs.createReadStream("./audio_237.wav", {
+const audioDataStream = fs.createReadStream("./test.wav", {
   highWaterMark: 320,
 });
 audioDataStream.on("data", (chunk) => {

@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package vbee.stt.v1;
+
+service SttService {
+  rpc Recognize (stream StreamingRecognitionRequest) returns (RecognitionResponse) {}
+  rpc StreamingRecognize (stream StreamingRecognitionRequest) returns (stream StreamingRecognitionResponse) {}
+}
+
+message StreamingRecognitionRequest {
+  oneof streaming_request {
+    RecognitionConfig config = 1;
+    bytes audio_content = 2;
+  }
+}
+
+message RecognitionConfig {
+  RecognitionSpec specification = 1;
+}
+
+message RecognitionSpec {
+  string model = 1;
+  bool record = 2;
+  bool partial_results = 3;
+  bool single_utterance = 4;
+  bool raw_results = 5;
+  bool save_audio = 6;
+}
+
+message RecognitionResponse {
+  string text = 1;
+  bool received = 2;
+}
+
+message StreamingRecognitionResponse {
+  string text = 1;
+  bool final = 2;
+}
+
+message SpeechRecognitionChunk {
+  repeated SpeechRecognitionAlternative alternatives = 1;
+  bool final = 2;
+  bool end_of_utterance = 3;
+}
+
+message SpeechRecognitionAlternative {
+  string text = 1;
+  float confidence = 2;
+}

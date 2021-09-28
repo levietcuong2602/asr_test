@@ -1,5 +1,7 @@
-var redis = require('redis');
-var bluebird = require('bluebird');
+const redis = require('redis');
+const bluebird = require('bluebird');
+
+const { REDIS_PORT, REDIS_HOST } = require('../configs');
 
 bluebird.promisifyAll(redis.RedisClient.prototype);
 bluebird.promisifyAll(redis.Multi.prototype);
@@ -169,8 +171,8 @@ class RedisPool {
 RedisPool.pop = RedisPool.getClient;
 RedisPool.push = RedisPool.release;
 const redis_config = {
-  port: 6379,
-  host: process.env.redis_host || 'mrcp_speech_to_text_redis',
+  port: REDIS_PORT,
+  host: REDIS_HOST || 'mrcp_speech_to_text_redis',
   options: {},
   // password: '',
   maxConnections: 150,

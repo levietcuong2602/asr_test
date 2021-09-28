@@ -5,7 +5,7 @@ const _ = require("lodash");
 
 require("dotenv").config();
 
-const PROTO_PATH = path.join(__dirname, "./stt_vbee_service.proto");
+const PROTO_PATH = path.join(__dirname, "../lib/stt_vbee_service.proto");
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
   keepCase: true,
   longs: String,

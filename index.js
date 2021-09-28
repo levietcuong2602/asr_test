@@ -1,47 +1,36 @@
-const fs = require("fs");
+const express = require('express');
+const compression = require('compression');
+const bodyParser = require('body-parser');
+const expressStatusMonitor = require('express-status-monitor');
+const morgan = require('morgan');
+const cors = require('cors');
+const helmet = require('helmet');
+const path = require('path');
+const errorHandler = require('./middlewares/errorHandler');
+const camelcaseRequest = require('./middlewares/camelCaseRequest');
+const snakecaseResponse = require('./middlewares/snakeCaseResponse');
 
-const { VbeeSpeech } = require("./vbee");
-const { VaisSpeech } = require("./vais");
-const { PROVIDER } = require("./constants");
-// test stt vbee
-const ServiceSpeech = (provider) => {
-  switch (provider) {
-    case PROVIDER.VBEE:
-      return new VbeeSpeech();
-    case PROVIDER.VAIS:
-      return new VaisSpeech();
-    default:
-      return null;
-  }
-};
+require('dotenv').config();
+const app = express();
 
-const test = ServiceSpeech(PROVIDER.VAIS);
+app.use(cors());
+app.use(expressStatusMonitor());
+app.use(helmet());
+app.use(compression());
+app.use(morgan('dev'));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(camelcaseRequest);
+app.use(snakecaseResponse());
+app.use(express.static(path.join(__dirname, 'public')));
 
-const audioDataStream = fs.createReadStream("./test.wav", {
-  highWaterMark: 320,
+require('./routes')(app);
+
+app.use(errorHandler);
+
+const { PORT } = process.env;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
-audioDataStream.on("data", (chunk) => {
-  test.recognizeStream.write({ audio_content: chunk });
-});
 
-audioDataStream.on("end", () => {
-  test.recognizeStream.end();
-});
-
-// fs.readFile("./test_01.raw", function (err, data) {
-//   if (err) throw err;
-//   console.log({ data });
-//   let count = 0;
-//   const chunkSize = 640;
-//   for (var i = 0; i < data.length; i += chunkSize) {
-//     buffer = data.slice(i, Math.min(i + chunkSize, data.length));
-//     request = {
-//       audio_content: buffer,
-//     };
-//     count += 1;
-
-//     test.recognizeStream.write(request);
-//   }
-//   console.log("count", count);
-//   test.recognizeStream.end();
-// });
+require('./services/test').testSpeech();

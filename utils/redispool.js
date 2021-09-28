@@ -1,10 +1,10 @@
-var redis = require("redis");
-var bluebird = require("bluebird");
+var redis = require('redis');
+var bluebird = require('bluebird');
 
 bluebird.promisifyAll(redis.RedisClient.prototype);
 bluebird.promisifyAll(redis.Multi.prototype);
 
-const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+const delay = ms => new Promise(res => setTimeout(res, ms));
 
 /**
  * RedisPool singleton class
@@ -38,7 +38,7 @@ class RedisPool {
     this.waitingTasks = [];
 
     //add some userful function to redis client
-    this.pool.forEach((rd) => {
+    this.pool.forEach(rd => {
       /**
        * Get value and convert it to integer from redis
        *
@@ -46,7 +46,7 @@ class RedisPool {
        * @param {Number} defaultValue default value if key not exists
        * @return {Number}
        */
-      rd.getIntAsync = async function (key, defaultValue = 0) {
+      rd.getIntAsync = async function(key, defaultValue = 0) {
         let value = await rd.getAsync(key);
         return parseInt(value || defaultValue);
       };
@@ -58,7 +58,7 @@ class RedisPool {
        * @param {Number} defaultValue default value if key not exists
        * @return {Number}
        */
-      rd.getFloatAsync = async function (key, defaultValue = 0.0) {
+      rd.getFloatAsync = async function(key, defaultValue = 0.0) {
         let value = await rd.getAsync(key);
         return parseFloat(value || defaultValue);
       };
@@ -69,24 +69,24 @@ class RedisPool {
        * @param {String} key redis key
        * @return {Object}
        */
-      rd.getJSONAsync = async function (key) {
+      rd.getJSONAsync = async function(key) {
         return await rd
           .getAsync(key)
-          .then((val) => (val ? JSON.parse(val) : val));
+          .then(val => (val ? JSON.parse(val) : val));
       };
 
       /**
        * release redis client
        */
-      rd.release = function () {
+      rd.release = function() {
         RedisPool.release(rd);
       };
     });
 
     //wrapper all client query commands
     Object.getOwnPropertyNames(redis.RedisClient.prototype)
-      .filter((name) => name.endsWith("Async"))
-      .forEach((name) => {
+      .filter(name => name.endsWith('Async'))
+      .forEach(name => {
         this[name] = (...args) => this.command(name, ...args);
       });
 
@@ -123,7 +123,7 @@ class RedisPool {
    * @return {Promise<RedisClient>}            redis client
    */
   static getClient(msAutoRelease = 500) {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       if (this.pool.length) {
         let rd = this.pool.pop();
         setTimeout(() => this.release(rd), msAutoRelease);
@@ -170,7 +170,7 @@ RedisPool.pop = RedisPool.getClient;
 RedisPool.push = RedisPool.release;
 const redis_config = {
   port: 6379,
-  host: process.env.redis_host || "mrcp_speech_to_text_redis",
+  host: process.env.redis_host || 'mrcp_speech_to_text_redis',
   options: {},
   // password: '',
   maxConnections: 150,

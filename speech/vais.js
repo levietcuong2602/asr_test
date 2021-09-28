@@ -2,9 +2,10 @@ const fs = require("fs");
 const grpc = require("@grpc/grpc-js");
 const protoLoader = require("@grpc/proto-loader");
 const _ = require("lodash");
+const path = require("path");
 require("dotenv").config();
 
-const PROTO_PATH = "./stt_vais_service.proto";
+const PROTO_PATH = path.join(__dirname, "../lib/stt_vais_service.proto");
 
 const options = {
   keepCase: true,

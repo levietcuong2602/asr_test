@@ -1,9 +1,16 @@
+/* eslint-disable no-bitwise */
+/* eslint-disable no-buffer-constructor */
+/* eslint-disable func-names */
 const fs = require('fs');
 
 const { ServiceSpeech } = require('../speech');
 const { logger } = require('../utils/logger');
 const { ipHeader, getObjectFromConfigBuffer } = require('../utils/parser');
 const { PROVIDER, RECOGNIZE_STATE, REDIS_QUEUE_NAME } = require('../constants');
+
+const subRecognize = require('../utils/redis').subscriber();
+const subRecognizeResult = require('../utils/redis').subscriber();
+const subViewTimeAsr = require('../utils/redis').subscriber();
 
 const MAPING_REQUEST_SPEECH = {};
 
@@ -35,37 +42,29 @@ const testSpeech = () => {
 
   //     test.recognizeStream.write(request);
   //   }
-  //   console.log("count", count);
+  //  logger.info("count", count);
   //   test.recognizeStream.end();
   // });
 };
 
 const subscribeViewTimeAsr = () => {
-  const { subscriber } = require('../utils/redis');
-  subscriber.on('message', function(channel, message) {
-    console.log('subscribeViewTimeAsr', JSON.stringify(message));
+  subViewTimeAsr.on('message', function(channel, message) {
+    logger.info('subscribeViewTimeAsr', JSON.stringify(message));
     const data = new Buffer(message, 'base64');
   });
-  subscriber.subscribe('list_time_process_asr');
+  subViewTimeAsr.subscribe('list_time_process_asr');
 };
 
 const subscribeRecognizeResult = () => {
-  const { subscriber } = require('../utils/redis');
-  subscriber.on('message', function(channel, message) {
-    console.log('[subscribeRecognizeResult] data: ', JSON.stringify(message));
-    const buffer = new Buffer(message, 'base64');
-    const { len_config: configLength, config } = ipHeader.parse(buffer);
-    console.log(
-      '[subscribeRecognizeResult] data: ',
-      JSON.stringify({ configLength, config }),
-    );
+  subRecognizeResult.on('message', function(channel, message) {
+    logger.warn('[subscribeRecognizeResult] data: ', JSON.stringify(message));
+    const { sessionId, uuid, isFinal, text } = JSON.parse(message);
   });
-  subscriber.subscribe(REDIS_QUEUE_NAME.REDIS_QUEUE_RECOGNIZE_RESULT);
+  subRecognizeResult.subscribe(REDIS_QUEUE_NAME.REDIS_QUEUE_RECOGNIZE_RESULT);
 };
 
 const subscribeRecognize = () => {
-  const { subscriber } = require('../utils/redis');
-  subscriber.on('message', function(channel, message) {
+  subRecognize.on('message', function(channel, message) {
     logger.info('[subscribeRecognize] subscribe recognize');
     const buffer = new Buffer(message, 'base64');
     const { len_config: configLength, config } = ipHeader.parse(buffer);
@@ -108,7 +107,7 @@ const subscribeRecognize = () => {
     }
 
     const bytes = buffer.slice(8 + configLength);
-    console.log({ bytes });
+    logger.info({ bytes });
     // receive bytes data
     speech.receiveByteData({ uuid: sessionIdLua, bytes });
     if (
@@ -123,7 +122,7 @@ const subscribeRecognize = () => {
     }
   });
 
-  subscriber.subscribe(REDIS_QUEUE_NAME.REDIS_QUEUE_RECOGNIZE);
+  subRecognize.subscribe(REDIS_QUEUE_NAME.REDIS_QUEUE_RECOGNIZE);
 };
 
 module.exports = {

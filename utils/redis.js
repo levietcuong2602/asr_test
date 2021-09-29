@@ -22,10 +22,11 @@ const publisher = redis.createClient({
   password: REDIS_PASSWORD || '',
 });
 
-const subscriber = redis.createClient({
-  port: REDIS_PORT,
-  host: REDIS_HOST,
-  password: REDIS_PASSWORD || '',
-});
+const subscriber = () =>
+  redis.createClient({
+    port: REDIS_PORT,
+    host: REDIS_HOST,
+    password: REDIS_PASSWORD || '',
+  });
 
 module.exports = { client, publisher, subscriber };

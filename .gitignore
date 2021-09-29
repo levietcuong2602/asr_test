@@ -1,4 +1,4 @@
-credential_google.json
+/configs/credential_google.json
 .env
 # Test directory
 test/

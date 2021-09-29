@@ -1,3 +1,4 @@
+/* eslint-disable func-names */
 const fs = require('fs');
 const _ = require('lodash');
 const path = require('path');
@@ -33,7 +34,7 @@ function VaisSpeech({ sessionId, uuid, recognizeModel, apiKey }) {
   const request = {
     streaming_config: {
       single_utterance: true,
-      interim_results: true,
+      interim_results: false,
       partial_results: true,
       config: {
         encoding: 1,
@@ -60,7 +61,7 @@ function VaisSpeech({ sessionId, uuid, recognizeModel, apiKey }) {
 
 VaisSpeech.prototype.startRecognitionStream = function({ request, apiKey }) {
   const endpoint = 'asr-telephone-fast.vais.vn:80';
-  console.log('endpoint', endpoint);
+  logger.info('endpoint', endpoint);
 
   const client = new speech.Speech(endpoint, grpc.credentials.createInsecure());
   const meta = new grpc.Metadata();
@@ -70,11 +71,11 @@ VaisSpeech.prototype.startRecognitionStream = function({ request, apiKey }) {
     .StreamingRecognize(meta)
     .on('data', function(data) {
       logger.info('[VaisSpeech][Transcription] data: ', JSON.stringify(data));
-      const results = data.results;
+      const { results } = data;
 
       let transcript = '';
       let isFinal = true;
-      if (results.length != 0) {
+      if (results.length !== 0) {
         isFinal = results[0].is_final;
         transcript = results[0].alternatives[0].transcript.trim();
         logger.info(
@@ -102,10 +103,10 @@ VaisSpeech.prototype.startRecognitionStream = function({ request, apiKey }) {
       );
     })
     .on('error', function(err) {
-      console.log('error: ', err);
+      logger.error('[VaisSpeech][Transcription] error: ', err);
     })
     .on('end', function() {
-      console.log('end');
+      logger.info('[VaisSpeech][Transcription] end');
     });
 
   this.recognizeStream.write(request);
@@ -158,7 +159,7 @@ VaisSpeech.prototype.receiveByteData = function({ uuid, bytes }) {
     } catch (error) {
       logger.error(
         '[VaisSpeech][receiveByteData] receive bytes data error: ',
-        e.message,
+        error.message,
       );
 
       this.stopRecognitionStream();

@@ -1,7 +1,6 @@
 /* eslint-disable func-names */
 const speech = require('@google-cloud/speech');
 const path = require('path');
-const streamifier = require('streamifier');
 
 require('dotenv').config();
 
@@ -26,7 +25,9 @@ function GoogleSpeech({ sessionId, uuid, recognizeModel }) {
       sampleRateHertz: 8000,
       languageCode: 'vi-VN',
     },
-    interimResults: false,
+    interimResults: true,
+    single_utterance: true,
+    partial_results: true,
   };
 
   this.startRecognitionStream({ request });
@@ -41,15 +42,37 @@ GoogleSpeech.prototype.startRecognitionStream = function({ request }) {
     })
     .on('data', data => {
       logger.warn('[GoogleSpeech][Transcription] data: ', JSON.stringify(data));
+
+      let transcript = '';
+      let isFinal = true;
       if (data.error) {
         // error
         logger.error('[GoogleSpeech][Transcription] data.error: ', data.error);
       } else if (data.results) {
-        logger.warn(
-          '[GoogleSpeech][Transcription]data.results: ',
-          JSON.stringify(data.results),
+        isFinal = data.results[0].isFinal;
+        transcript = data.results[0].alternatives[0].transcript.trim();
+        logger.info(
+          '[GoogleSpeech][Transcription]:',
+          JSON.stringify({ transcript, isFinal }),
         );
+
+        if (!transcript) {
+          const words = data.results[0].alternatives[0].words || [];
+          transcript = words.map(({ word }) => word).join(' ');
+        }
+        logger.warn('[GoogleSpeech][Transcription] transcript= ', transcript);
       }
+
+      // send publish data
+      publisher.publishAsync(
+        REDIS_QUEUE_NAME.REDIS_QUEUE_RECOGNIZE_RESULT,
+        JSON.stringify({
+          sessionId: this.sessionId,
+          uuid: this.uuid,
+          isFinal,
+          text: transcript,
+        }),
+      );
     })
     .on('end', function() {
       logger.info('[GoogleSpeech][Transcription] end');
@@ -64,36 +87,20 @@ GoogleSpeech.prototype.stopRecognitionStream = function() {
     this.recognizeStream.end();
   }
   this.recognizeStream = null;
-
-  setTimeout(() => {
-    logger.info(
-      this.sessionId,
-      `[GoogleSpeech][stopRecognitionStream] auto close timeout`,
-    );
-    // send publish data
-    publisher.publishAsync(
-      REDIS_QUEUE_NAME.REDIS_QUEUE_RECOGNIZE_RESULT,
-      JSON.stringify({
-        sessionId: this.sessionId,
-        uuid: this.uuid,
-        isFinal: true,
-        text: this.lastText,
-      }),
-    );
-  }, 2 * 1000);
 };
 
 GoogleSpeech.prototype.receiveByteData = function({ uuid, bytes }) {
   this.uuid = uuid;
-  if (this.recognizeStream && !this.isStopRecognize) {
+  if (
+    this.recognizeStream &&
+    !this.recognizeStream.isPaused() &&
+    !this.isStopRecognize
+  ) {
     try {
       logger.info('[GoogleSpeech][receiveByteData] receive bytes data');
       this.recognizeStream.write(bytes);
     } catch (error) {
-      logger.error(
-        '[GoogleSpeech][receiveByteData] receive bytes data error: ',
-        error.message,
-      );
+      logger.error('[GoogleSpeech][receiveByteData] error: ', error.message);
 
       this.stopRecognitionStream();
     }

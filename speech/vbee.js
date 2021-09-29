@@ -29,11 +29,11 @@ function VbeeSpeech({ sessionId, uuid, recognizeModel, apiKey }) {
 
   // variable
   const request = {
-    specification: {
+    streaming_request: {
       model: 'Wav2vec2',
       record: false,
       partial_results: true,
-      single_utterance: false,
+      single_utterance: true,
       interim_results: false,
       config: {
         encoding: 1,
@@ -91,7 +91,7 @@ VbeeSpeech.prototype.startRecognitionStream = function({ request, apiKey }) {
   this.recognizeStream = client
     .StreamingRecognize(meta)
     .on('data', function(data) {
-      logger.info('[VbeeSpeech][Transcription] data: ', JSON.stringify(data));
+      logger.warn('[VbeeSpeech][Transcription] data: ', JSON.stringify(data));
       const { text, final } = data;
       // send publish data
       publisher.publishAsync(
@@ -111,7 +111,7 @@ VbeeSpeech.prototype.startRecognitionStream = function({ request, apiKey }) {
       logger.info('[VbeeSpeech][Transcription] end');
     });
 
-  this.recognizeStream.write({ config: request });
+  this.recognizeStream.write(request);
 };
 
 VbeeSpeech.prototype.stopRecognitionStream = function() {

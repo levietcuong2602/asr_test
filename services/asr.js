@@ -12,7 +12,12 @@ const subRecognize = require('../utils/redis').subscriber();
 const subRecognizeResult = require('../utils/redis').subscriber();
 const subViewTimeAsr = require('../utils/redis').subscriber();
 
-const MAPING_REQUEST_SPEECH = {};
+const REDIS_KEYS = {
+  CHECK_SESSION_REQUEST: id => `check_session_request_${id}`,
+  CHECK_AGENT_FORWARDED_CALL: (agentId, callId) =>
+    `check_agent_${agentId}_forwarded_call_${callId}`,
+  AGENT_BREAK_TIME: id => `break_time_agent_${id}_status`,
+};
 
 const testSpeech = () => {
   const test = ServiceSpeech(PROVIDER.VBEE);

@@ -70,7 +70,7 @@ VaisSpeech.prototype.startRecognitionStream = function({ request, apiKey }) {
   this.recognizeStream = client
     .StreamingRecognize(meta)
     .on('data', function(data) {
-      logger.info('[VaisSpeech][Transcription] data: ', JSON.stringify(data));
+      logger.warn('[VaisSpeech][Transcription] data: ', JSON.stringify(data));
       const { results } = data;
 
       let transcript = '';
@@ -78,7 +78,7 @@ VaisSpeech.prototype.startRecognitionStream = function({ request, apiKey }) {
       if (results.length !== 0) {
         isFinal = results[0].is_final;
         transcript = results[0].alternatives[0].transcript.trim();
-        logger.info(
+        logger.warn(
           '[VaisSpeech][Transcription]: ',
           JSON.stringify({ transcript, isFinal }),
         );

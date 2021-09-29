@@ -84,29 +84,29 @@ const test = new VbeeSpeech({
   uuid: '123',
 });
 
-// const audioDataStream = fs.createReadStream('./test.wav', {
-//   highWaterMark: 320,
-// });
-// audioDataStream.on('data', chunk => {
-//   test.call.write({ audio_content: chunk });
-// });
+const audioDataStream = fs.createReadStream('./test.wav', {
+  highWaterMark: 320,
+});
+audioDataStream.on('data', chunk => {
+  test.recognizeStream.write({ audio_content: chunk });
+});
 
-// audioDataStream.on('end', () => {
-//   test.call.end();
-// });
-
-fs.readFile('./test_01.raw', function(err, data) {
-  if (err) throw err;
-  let count = 0;
-  for (var i = 0; i < data.length; i += 640) {
-    buffer = data.slice(i, Math.min(i + 640, data.length));
-    request = {
-      audio_content: buffer,
-    };
-    count += 1;
-
-    test.recognizeStream.write(request);
-  }
-  console.log('count', count);
+audioDataStream.on('end', () => {
   test.recognizeStream.end();
 });
+
+// fs.readFile('./test_01.raw', function(err, data) {
+//   if (err) throw err;
+//   let count = 0;
+//   for (var i = 0; i < data.length; i += 640) {
+//     buffer = data.slice(i, Math.min(i + 640, data.length));
+//     request = {
+//       audio_content: buffer,
+//     };
+//     count += 1;
+
+//     test.recognizeStream.write(request);
+//   }
+//   console.log('count', count);
+//   test.recognizeStream.end();
+// });

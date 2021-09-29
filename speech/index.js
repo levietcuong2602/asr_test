@@ -5,14 +5,14 @@ const { GoogleSpeech } = require('./google');
 const { PROVIDER } = require('../constants');
 // test stt vbee
 const ServiceSpeech = provider => params => {
-  return new GoogleSpeech(params);
+  return new VbeeSpeech(params);
   switch (provider) {
     case PROVIDER.VBEE:
       return new VbeeSpeech(params);
     case PROVIDER.VAIS:
       return new VaisSpeech(params);
     default:
-      return null;
+      return new GoogleSpeech(params);
   }
 };
 

@@ -7,6 +7,9 @@ const { ServiceSpeech } = require('../speech');
 const { VbeeSmartdialog } = require('../smartdialog/vbee');
 const { logger } = require('../utils/logger');
 const { ipHeader, getObjectFromConfigBuffer } = require('../utils/parser');
+const { stopRecognizeTimeout } = require('../utils/speech');
+const { saveVariableGlobal } = require('../utils/utils');
+
 const { PROVIDER, RECOGNIZE_STATE, REDIS_QUEUE_NAME } = require('../constants');
 
 const { client: redisClient } = require('../utils/redis');
@@ -15,10 +18,11 @@ const subRecognizeResult = require('../utils/redis').subscriber();
 const subViewTimeAsr = require('../utils/redis').subscriber();
 
 const MAPING_REQUEST_SPEECH = {};
+const MAPING_REQUEST_SMARTDIALOG = {};
 
 const REDIS_KEYS = {
   CHECK_SESSION_REQUEST: id => `check_session_request_${id}`,
-  CHECK_SEND_CLIENT: id => `check_send_client_${id}`,
+  CHECK_SEND_BY_SESSION: id => `check_send_BY_SESSION_${id}`,
 };
 
 const testSpeech = () => {
@@ -64,17 +68,78 @@ const subscribeViewTimeAsr = () => {
 
 const subscribeRecognizeResult = () => {
   subRecognizeResult.on('message', async function(channel, message) {
-    logger.warn('[subscribeRecognizeResult] data: ', JSON.stringify(message));
+    logger.warn(
+      '[asr][subscribeRecognizeResult] data: ',
+      JSON.stringify(message),
+    );
     const { sessionId, uuid, isFinal, text } = JSON.parse(message);
+
+    const speech = MAPING_REQUEST_SPEECH[sessionId] || null;
+    const speechBackup =
+      MAPING_REQUEST_SPEECH[`speech_backup_${sessionId}`] || null;
+
+    if (speech) return;
+    // check 2s mà nội dung không thay đổi thì ngắt
+    if (!isFinal && text) {
+      const currentTime = Math.floor(new Date().valueOf() / 1000);
+      const {
+        lastTimeTextChange,
+        isStopRecognize,
+        lastText,
+        recognizeTimeoutId,
+      } = speech;
+      if (
+        !isStopRecognize &&
+        lastTimeTextChange &&
+        lastText === text &&
+        currentTime - lastTime >= 2 &&
+        speech
+      ) {
+        logger.info(
+          '[asr][subscribeRecognizeResult] stop recognize because text not change after 2s',
+        );
+        speech.lastTimeTextChange = currentTime;
+        if (recognizeTimeoutId) {
+          clearTimeout(recognizeTimeoutId);
+        }
+        speech.stopRecognitionStream();
+      }
+
+      if (lastTimeTextChange || lastText !== text) {
+        speech.lastTimeTextChange = currentTime;
+      }
+    }
+    // set timeout stop recognize
+    if (speech && speech.recognizeTimeoutId) {
+      clearTimeout(speech.recognizeTimeoutId);
+    }
+    if (speech && !isFinal) {
+      speech.recognizeTimeoutId = stopRecognizeTimeout(speech, 2000);
+    }
     if (!isFinal) return null;
 
     // check session send message
+    const isSendRequest = await redisClient.getAsync(
+      REDIS_KEYS.CHECK_SEND_BY_SESSION(sessionId),
+    );
+    if (isSendRequest) {
+      return;
+    }
     await redisClient.setAsync(
-      REDIS_KEYS.CHECK_SEND_CLIENT(sessionId),
+      REDIS_KEYS.CHECK_SEND_BY_SESSION(sessionId),
       true,
       'EX',
       300,
     );
+
+    if (speech) {
+      speech.stopRecognitionStream();
+    }
+    if (speechBackup) {
+      speechBackup.stopRecognitionStream();
+    }
+
+    // evaluate result recognize
 
     return true;
   });
@@ -83,7 +148,6 @@ const subscribeRecognizeResult = () => {
 
 const subscribeRecognize = () => {
   subRecognize.on('message', function(channel, message) {
-    logger.info('[subscribeRecognize] subscribe recognize');
     const buffer = new Buffer(message, 'base64');
     const { len_config: configLength, config } = ipHeader.parse(buffer);
     const {
@@ -96,17 +160,17 @@ const subscribeRecognize = () => {
       provider_backup: providerBackup,
       api_key: apiKey,
     } = getObjectFromConfigBuffer(config);
-    logger.info(
-      '[subscribeRecognize] data=',
-      JSON.stringify({
-        state,
-        sessionId,
-        sessionIdLua,
-        provider,
-        recognizeModel,
-        providerBackup,
-      }),
-    );
+    // logger.info(
+    //   '[asr][subscribeRecognize] data=',
+    //   JSON.stringify({
+    //     state,
+    //     sessionId,
+    //     sessionIdLua,
+    //     provider,
+    //     recognizeModel,
+    //     providerBackup,
+    //   }),
+    // );
     let speech = MAPING_REQUEST_SPEECH[sessionId] || null;
     let speechBackup =
       MAPING_REQUEST_SPEECH[`speech_backup_${sessionId}`] || null;
@@ -117,16 +181,13 @@ const subscribeRecognize = () => {
         recognizeModel,
         apiKey,
       });
-      MAPING_REQUEST_SPEECH[sessionId] = speech;
-
+      // save speech into varivale global
+      saveVariableGlobal(MAPING_REQUEST_SPEECH, sessionId, speech);
       // set field speech
       speech.requestId = requestId;
 
       // settimout stop recognize
-      speech.recognizeTimeoutId = setTimeout(() => {
-        // stop recognize
-        speech.stopRecognitionStream();
-      }, 6000);
+      speech.recognizeTimeoutId = stopRecognizeTimeout(speech, 6000);
 
       if (providerBackup) {
         speechBackup = ServiceSpeech(provider)({
@@ -135,7 +196,12 @@ const subscribeRecognize = () => {
           recognizeModel,
           apiKey,
         });
-        MAPING_REQUEST_SPEECH[`speech_backup_${sessionId}`] = speechBackup;
+        // save speech into varivale global
+        saveVariableGlobal(
+          MAPING_REQUEST_SPEECH,
+          `speech_backup_${sessionId}`,
+          speechBackup,
+        );
       }
     }
 

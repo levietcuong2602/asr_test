@@ -7,7 +7,7 @@ const _ = require('lodash');
 require('dotenv').config();
 const { logger } = require('../utils/logger');
 const { publisher } = require('../utils/redis');
-const { REDIS_QUEUE_NAME } = require('../constants');
+const { REDIS_QUEUE_NAME, PROVIDER } = require('../constants');
 
 const API_KEY_DEFAULT = '6FV9YwvcaSugKq6k';
 
@@ -26,6 +26,7 @@ function VbeeSpeech({ sessionId, uuid, recognizeModel, apiKey }) {
   this.sessionId = sessionId;
   this.uuid = uuid;
   this.lastText = 'Im lặng';
+  this.provider = PROVIDER.VBEE;
 
   // variable
   const request = {

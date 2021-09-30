@@ -11,6 +11,7 @@ const camelcaseRequest = require('./middlewares/camelCaseRequest');
 const snakecaseResponse = require('./middlewares/snakeCaseResponse');
 
 require('dotenv').config();
+
 const app = express();
 
 app.use(cors());
@@ -32,6 +33,8 @@ const { PORT } = process.env;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+// global.MAPING_REQUEST_SPEECH = {};
 
 require('./services/asr').subscribeRecognize();
 require('./services/asr').subscribeRecognizeResult();

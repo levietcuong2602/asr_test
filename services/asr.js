@@ -4,19 +4,21 @@
 const fs = require('fs');
 
 const { ServiceSpeech } = require('../speech');
+const { VbeeSmartdialog } = require('../smartdialog/vbee');
 const { logger } = require('../utils/logger');
 const { ipHeader, getObjectFromConfigBuffer } = require('../utils/parser');
 const { PROVIDER, RECOGNIZE_STATE, REDIS_QUEUE_NAME } = require('../constants');
 
+const { client: redisClient } = require('../utils/redis');
 const subRecognize = require('../utils/redis').subscriber();
 const subRecognizeResult = require('../utils/redis').subscriber();
 const subViewTimeAsr = require('../utils/redis').subscriber();
 
+const MAPING_REQUEST_SPEECH = {};
+
 const REDIS_KEYS = {
   CHECK_SESSION_REQUEST: id => `check_session_request_${id}`,
-  CHECK_AGENT_FORWARDED_CALL: (agentId, callId) =>
-    `check_agent_${agentId}_forwarded_call_${callId}`,
-  AGENT_BREAK_TIME: id => `break_time_agent_${id}_status`,
+  CHECK_SEND_CLIENT: id => `check_send_client_${id}`,
 };
 
 const testSpeech = () => {
@@ -61,9 +63,20 @@ const subscribeViewTimeAsr = () => {
 };
 
 const subscribeRecognizeResult = () => {
-  subRecognizeResult.on('message', function(channel, message) {
+  subRecognizeResult.on('message', async function(channel, message) {
     logger.warn('[subscribeRecognizeResult] data: ', JSON.stringify(message));
     const { sessionId, uuid, isFinal, text } = JSON.parse(message);
+    if (!isFinal) return null;
+
+    // check session send message
+    await redisClient.setAsync(
+      REDIS_KEYS.CHECK_SEND_CLIENT(sessionId),
+      true,
+      'EX',
+      300,
+    );
+
+    return true;
   });
   subRecognizeResult.subscribe(REDIS_QUEUE_NAME.REDIS_QUEUE_RECOGNIZE_RESULT);
 };
@@ -75,15 +88,10 @@ const subscribeRecognize = () => {
     const { len_config: configLength, config } = ipHeader.parse(buffer);
     const {
       state,
-      start_input_timers,
-      no_input_timeout,
-      recognition_timeout,
       session_id: sessionId,
       uuid: sessionIdLua,
       provider,
       recognize_model: recognizeModel,
-      caller_id_number,
-      destination_number,
       request_id: requestId,
       provider_backup: providerBackup,
       api_key: apiKey,
@@ -100,6 +108,8 @@ const subscribeRecognize = () => {
       }),
     );
     let speech = MAPING_REQUEST_SPEECH[sessionId] || null;
+    let speechBackup =
+      MAPING_REQUEST_SPEECH[`speech_backup_${sessionId}`] || null;
     if (!speech) {
       speech = ServiceSpeech(provider)({
         sessionId,
@@ -107,12 +117,29 @@ const subscribeRecognize = () => {
         recognizeModel,
         apiKey,
       });
-      // TODO
       MAPING_REQUEST_SPEECH[sessionId] = speech;
+
+      // set field speech
+      speech.requestId = requestId;
+
+      // settimout stop recognize
+      speech.recognizeTimeoutId = setTimeout(() => {
+        // stop recognize
+        speech.stopRecognitionStream();
+      }, 6000);
+
+      if (providerBackup) {
+        speechBackup = ServiceSpeech(provider)({
+          sessionId,
+          uuid: sessionIdLua,
+          recognizeModel,
+          apiKey,
+        });
+        MAPING_REQUEST_SPEECH[`speech_backup_${sessionId}`] = speechBackup;
+      }
     }
 
     const bytes = buffer.slice(8 + configLength);
-    logger.info({ bytes });
     // receive bytes data
     speech.receiveByteData({ uuid: sessionIdLua, bytes });
     if (
@@ -124,6 +151,21 @@ const subscribeRecognize = () => {
     ) {
       // stop recognize
       speech.stopRecognitionStream();
+    }
+
+    // speech backup
+    if (speechBackup) {
+      speechBackup.receiveByteData({ uuid: sessionIdLua, bytes });
+      if (
+        [
+          RECOGNIZE_STATE.DETECT_SILENT,
+          RECOGNIZE_STATE.DETECT_NO_INPUT,
+          RECOGNIZE_STATE.DETECT_RECOGNIZE_TIMEOUT,
+        ].includes(~~state)
+      ) {
+        // stop recognize
+        speechBackup.stopRecognitionStream();
+      }
     }
   });
 

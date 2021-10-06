@@ -110,6 +110,16 @@ VbeeSpeech.prototype.startRecognitionStream = function({ request, apiKey }) {
     })
     .on('end', function() {
       logger.info('[VbeeSpeech][Transcription] end');
+      // send publish data
+      publisher.publishAsync(
+        REDIS_QUEUE_NAME.REDIS_QUEUE_RECOGNIZE_RESULT,
+        JSON.stringify({
+          sessionId: this.sessionId,
+          uuid: this.uuid,
+          isFinal: true,
+          text: this.lastText,
+        }),
+      );
     });
 
   this.recognizeStream.write(request);
@@ -145,7 +155,9 @@ VbeeSpeech.prototype.receiveByteData = function({ uuid, bytes }) {
   this.uuid = uuid;
   if (this.recognizeStream && !this.isStopRecognize) {
     try {
-      logger.info('[VbeeSpeech][receiveByteData] receive bytes data');
+      logger.info(
+        `[VbeeSpeech][receiveByteData] receive bytes data ${bytes.length}`,
+      );
       let xrequest = {
         audio_content: bytes,
       };
@@ -167,8 +179,6 @@ VbeeSpeech.prototype.receiveByteData = function({ uuid, bytes }) {
 
       this.stopRecognitionStream();
     }
-  } else {
-    logger.error('[VbeeSpeech][receiveByteData] stream closed');
   }
 };
 

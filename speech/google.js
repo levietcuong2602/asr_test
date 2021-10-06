@@ -104,8 +104,6 @@ GoogleSpeech.prototype.receiveByteData = function({ uuid, bytes }) {
 
       this.stopRecognitionStream();
     }
-  } else {
-    logger.error('[GoogleSpeech][receiveByteData] stream closed');
   }
 };
 

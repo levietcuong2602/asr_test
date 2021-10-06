@@ -142,7 +142,9 @@ VaisSpeech.prototype.receiveByteData = function({ uuid, bytes }) {
   this.uuid = uuid;
   if (this.recognizeStream && !this.isStopRecognize) {
     try {
-      logger.info('[VaisSpeech][receiveByteData] receive bytes data');
+      logger.info(
+        `[VaisSpeech][receiveByteData] receive bytes data ${bytes.length}`,
+      );
       let xrequest = {
         audio_content: bytes,
       };
@@ -164,8 +166,6 @@ VaisSpeech.prototype.receiveByteData = function({ uuid, bytes }) {
 
       this.stopRecognitionStream();
     }
-  } else {
-    logger.error('[VaisSpeech][receiveByteData] stream closed');
   }
 };
 

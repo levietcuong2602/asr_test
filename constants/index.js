@@ -16,4 +16,8 @@ const REDIS_QUEUE_NAME = {
   REDIS_QUEUE_RECOGNIZE_RESULT: 'redis_queue_recognize_result',
 };
 
-module.exports = { PROVIDER, RECOGNIZE_STATE, REDIS_QUEUE_NAME };
+const VERSION_CHAT = {
+  'VER1.1': '1.1',
+};
+
+module.exports = { PROVIDER, RECOGNIZE_STATE, REDIS_QUEUE_NAME, VERSION_CHAT };

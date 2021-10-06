@@ -13,6 +13,7 @@ const { saveVariableGlobal } = require('../utils/utils');
 const { PROVIDER, RECOGNIZE_STATE, REDIS_QUEUE_NAME } = require('../constants');
 
 const { client: redisClient } = require('../utils/redis');
+const { request } = require('http');
 const subRecognize = require('../utils/redis').subscriber();
 const subRecognizeResult = require('../utils/redis').subscriber();
 const subViewTimeAsr = require('../utils/redis').subscriber();
@@ -174,6 +175,8 @@ const subscribeRecognize = () => {
     let speech = MAPING_REQUEST_SPEECH[sessionId] || null;
     let speechBackup =
       MAPING_REQUEST_SPEECH[`speech_backup_${sessionId}`] || null;
+    let smartdialog = MAPING_REQUEST_SMARTDIALOG[uuid] || null;
+
     if (!speech) {
       speech = ServiceSpeech(provider)({
         sessionId,
@@ -203,6 +206,11 @@ const subscribeRecognize = () => {
           speechBackup,
         );
       }
+    }
+
+    if (smartdialog) {
+      smartdialog.requestId = requestId;
+      smartdialog.clientId = sessionId;
     }
 
     const bytes = buffer.slice(8 + configLength);

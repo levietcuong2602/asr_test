@@ -34,7 +34,8 @@ app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
-// global.MAPING_REQUEST_SPEECH = {};
+global.MAPING_REQUEST_SPEECH = {};
+global.MAPING_REQUEST_SMARTDIALOG = {};
 
 require('./services/asr').subscribeRecognize();
 require('./services/asr').subscribeRecognizeResult();

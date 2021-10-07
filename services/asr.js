@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 /* eslint-disable no-bitwise */
 /* eslint-disable no-buffer-constructor */
 /* eslint-disable func-names */
@@ -7,24 +8,24 @@ const { ServiceSpeech } = require('../speech');
 const { VbeeSmartdialog } = require('../smartdialog/vbee');
 const { logger } = require('../utils/logger');
 const { ipHeader, getObjectFromConfigBuffer } = require('../utils/parser');
-const { stopRecognizeTimeout } = require('../utils/speech');
+const {
+  stopRecognizeTimeout,
+  predictResult,
+  correctAsrRequest,
+} = require('../utils/speech');
 const { saveVariableGlobal } = require('../utils/utils');
 
-const { PROVIDER, RECOGNIZE_STATE, REDIS_QUEUE_NAME } = require('../constants');
+const {
+  PROVIDER,
+  RECOGNIZE_STATE,
+  REDIS_QUEUE_NAME,
+  REDIS_KEYS,
+} = require('../constants');
 
 const { client: redisClient } = require('../utils/redis');
-const { request } = require('http');
 const subRecognize = require('../utils/redis').subscriber();
 const subRecognizeResult = require('../utils/redis').subscriber();
 const subViewTimeAsr = require('../utils/redis').subscriber();
-
-const MAPING_REQUEST_SPEECH = {};
-const MAPING_REQUEST_SMARTDIALOG = {};
-
-const REDIS_KEYS = {
-  CHECK_SESSION_REQUEST: id => `check_session_request_${id}`,
-  CHECK_SEND_BY_SESSION: id => `check_send_BY_SESSION_${id}`,
-};
 
 const testSpeech = () => {
   const test = ServiceSpeech(PROVIDER.VBEE);
@@ -73,11 +74,13 @@ const subscribeRecognizeResult = () => {
       '[asr][subscribeRecognizeResult] data: ',
       JSON.stringify(message),
     );
-    const { sessionId, uuid, isFinal, text } = JSON.parse(message);
+    const { sessionId, uuid, isFinal, provider } = JSON.parse(message);
+    let { text } = JSON.parse(message);
 
     const speech = MAPING_REQUEST_SPEECH[sessionId] || null;
     const speechBackup =
       MAPING_REQUEST_SPEECH[`speech_backup_${sessionId}`] || null;
+    const smartdialog = MAPING_REQUEST_SMARTDIALOG[uuid] || null;
 
     if (speech) return;
     // check 2s mà nội dung không thay đổi thì ngắt
@@ -89,11 +92,20 @@ const subscribeRecognizeResult = () => {
         lastText,
         recognizeTimeoutId,
       } = speech;
+      if (lastTimeTextChange) {
+        logger.info(
+          `[asr][subscribeRecognizeResult] ${sessionId} last time text change`,
+        );
+      } else {
+        logger.info(
+          `[asr][subscribeRecognizeResult] ${sessionId} last time text change init`,
+        );
+      }
       if (
         !isStopRecognize &&
         lastTimeTextChange &&
         lastText === text &&
-        currentTime - lastTime >= 2 &&
+        currentTime - lastTimeTextChange >= 2 &&
         speech
       ) {
         logger.info(
@@ -110,14 +122,21 @@ const subscribeRecognizeResult = () => {
         speech.lastTimeTextChange = currentTime;
       }
     }
-    // set timeout stop recognize
+
+    if (speech && text.length > 0 && speech.provider === provider) {
+      speech.lastText = text;
+    }
+    if (speechBackup && text.length > 0 && speechBackup.provider === provider) {
+      speechBackup.lastText = text;
+    }
+    // set timeout stop recognize after 2s
     if (speech && speech.recognizeTimeoutId) {
       clearTimeout(speech.recognizeTimeoutId);
     }
     if (speech && !isFinal) {
       speech.recognizeTimeoutId = stopRecognizeTimeout(speech, 2000);
     }
-    if (!isFinal) return null;
+    if (!isFinal) return;
 
     // check session send message
     const isSendRequest = await redisClient.getAsync(
@@ -140,9 +159,57 @@ const subscribeRecognizeResult = () => {
       speechBackup.stopRecognitionStream();
     }
 
-    // evaluate result recognize
+    // TODO check silent
 
-    return true;
+    // evaluate result recognize
+    if (
+      text.toLowerCase() === 'im lặng' &&
+      speech.lastText.toLowerCase() !== 'im lặng'
+    ) {
+      text = speech.lastText;
+    }
+    if (
+      text.toLowerCase() === 'im lặng' &&
+      speechBackup.lastText.toLowerCase() !== 'im lặng'
+    ) {
+      text = speechBackup.lastText;
+    }
+
+    logger.info(
+      `[asr][subscribeRecognizeResult] ${sessionId} text info request predict`,
+    );
+    const { recognizeModel } = speech;
+    const speechTextValid =
+      speech.lastText && speech.lastText.toLowerCase() !== 'im lặng';
+    const speechBackupTextValid =
+      speechBackup.lastText &&
+      speechBackup.lastText.toLowerCase() !== 'im lặng';
+    if (
+      ['yes_no'].includes(recognizeModel) &&
+      speechTextValid &&
+      speechBackupTextValid
+    ) {
+      const predict = await predictResult([
+        speechBackup.lastText,
+        speech.lastText,
+      ]);
+      logger.info('[asr][subscribeRecognizeResult] predict result: ', predict);
+      if (predict) {
+        text = predict;
+      }
+    }
+
+    if (['date', 'number'].includes(recognizeModel)) {
+      const correctAsr = await correctAsrRequest({
+        sentence: text,
+        type: recognizeModel,
+      });
+      if (correctAsr) {
+        text = correctAsr;
+      }
+    }
+    // smartdialog send message
+    smartdialog.sendMessage(text);
   });
   subRecognizeResult.subscribe(REDIS_QUEUE_NAME.REDIS_QUEUE_RECOGNIZE_RESULT);
 };
@@ -175,7 +242,7 @@ const subscribeRecognize = () => {
     let speech = MAPING_REQUEST_SPEECH[sessionId] || null;
     let speechBackup =
       MAPING_REQUEST_SPEECH[`speech_backup_${sessionId}`] || null;
-    let smartdialog = MAPING_REQUEST_SMARTDIALOG[uuid] || null;
+    const smartdialog = MAPING_REQUEST_SMARTDIALOG[sessionIdLua] || null;
 
     if (!speech) {
       speech = ServiceSpeech(provider)({

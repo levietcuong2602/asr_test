@@ -89,6 +89,7 @@ VbeeSpeech.prototype.startRecognitionStream = function({ request, apiKey }) {
   const meta = new grpc.Metadata();
   meta.add('api-key', apiKey);
 
+  const me = this;
   this.recognizeStream = client
     .StreamingRecognize(meta)
     .on('data', function(data) {
@@ -98,10 +99,11 @@ VbeeSpeech.prototype.startRecognitionStream = function({ request, apiKey }) {
       publisher.publishAsync(
         REDIS_QUEUE_NAME.REDIS_QUEUE_RECOGNIZE_RESULT,
         JSON.stringify({
-          sessionId: this.sessionId,
-          uuid: this.uuid,
+          sessionId: me.sessionId,
+          uuid: me.uuid,
           isFinal: final,
           text,
+          provider: me.provider,
         }),
       );
     })
@@ -114,10 +116,11 @@ VbeeSpeech.prototype.startRecognitionStream = function({ request, apiKey }) {
       publisher.publishAsync(
         REDIS_QUEUE_NAME.REDIS_QUEUE_RECOGNIZE_RESULT,
         JSON.stringify({
-          sessionId: this.sessionId,
-          uuid: this.uuid,
+          sessionId: me.sessionId,
+          uuid: me.uuid,
           isFinal: true,
-          text: this.lastText,
+          text: me.lastText,
+          provider: me.provider,
         }),
       );
     });
@@ -146,6 +149,7 @@ VbeeSpeech.prototype.stopRecognitionStream = function() {
         uuid: this.uuid,
         isFinal: true,
         text: this.lastText,
+        provider: this.provider,
       }),
     );
   }, 2 * 1000);

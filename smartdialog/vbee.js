@@ -1,4 +1,6 @@
 /* eslint-disable func-names */
+const uuid = require('uuid');
+const moment = require('moment-timezone');
 const WebSocketClient = require('websocket').client;
 
 const { logger } = require('../utils/logger');
@@ -15,9 +17,15 @@ function VbeeSmartdialog({
   version,
   phoneNumber,
   callbackFunction,
+  accessToken = '',
+  sessionId,
+  requestId,
+  updateWorkflowUrl,
 }) {
-  this.sessionId = ''; // uuid id lua
+  this.sessionId = sessionId; // uuid id lua
   this.clientId = ''; // session id ~ client id
+  this.requestId = requestId;
+  this.updateWorkflowUrl = updateWorkflowUrl;
   this.appId = appId;
   this.endpoint = endpoint || WS_ENDPOINT;
   this.version = version;
@@ -26,6 +34,8 @@ function VbeeSmartdialog({
   this.callbackFunction = callbackFunction;
   this.callbackUrl = callbackUrl;
   this.isSendInitRequest = false;
+  this.accessToken = accessToken;
+  this.asrAt = moment.tz(moment(), 'Asia/Ho_Chi_Minh').format();
 
   this.connect();
 }
@@ -56,7 +66,7 @@ VbeeSmartdialog.prototype.connect = function() {
     // TODO auto close after 5min
 
     // send message INIT
-    me.sendMessage({
+    me.send({
       type: 'INIT',
       return_array_action: true,
       app_id: me.appId,
@@ -167,18 +177,31 @@ VbeeSmartdialog.prototype.close = function() {
   this.connection = null;
 };
 
-VbeeSmartdialog.prototype.sendMessage = function(data) {
+VbeeSmartdialog.prototype.send = function(data) {
   if (this.connection) {
     logger.info(
-      `[VbeeSmartdialog][sendMessage] client ${
+      `[VbeeSmartdialog][send] client ${
         this.clientId
       } send message ${JSON.stringify(data)}`,
     );
 
     this.connection.send(JSON.stringify(data));
   } else {
-    logger.error('[VbeeSmartdialog][sendMessage] fail not connect');
+    logger.error('[VbeeSmartdialog][send] fail not connect');
   }
+};
+
+VbeeSmartdialog.prototype.sendMessage = function(text) {
+  this.currentMessage = text;
+  this.send({
+    type: 'CHAT',
+    access_token: this.accessToken,
+    app_id: this.appId,
+    message: {
+      text,
+      msg_id: uuid.v4(),
+    },
+  });
 };
 
 const heartbeat = function(ws, startTime) {
@@ -188,7 +211,7 @@ const heartbeat = function(ws, startTime) {
     return;
   }
   if (ws.connection) {
-    ws.connection.sendMessage(JSON.stringify({ type: 'PING' }));
+    ws.connection.send(JSON.stringify({ type: 'PING' }));
     setTimeout(() => heartbeat(ws, startTime), 10 * 1000);
   }
 };

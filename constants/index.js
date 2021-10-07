@@ -20,4 +20,16 @@ const VERSION_CHAT = {
   'VER1.1': '1.1',
 };
 
-module.exports = { PROVIDER, RECOGNIZE_STATE, REDIS_QUEUE_NAME, VERSION_CHAT };
+const REDIS_KEYS = {
+  CHECK_SESSION_REQUEST: id => `check_session_request_${id}`,
+  CHECK_SEND_BY_SESSION: id => `check_send_by_session_${id}`,
+  CHECK_SESSION_APP_ID: id => `check_session_app_id_${id}`,
+};
+
+module.exports = {
+  PROVIDER,
+  RECOGNIZE_STATE,
+  REDIS_QUEUE_NAME,
+  VERSION_CHAT,
+  REDIS_KEYS,
+};

@@ -40,3 +40,4 @@ global.MAPING_REQUEST_SMARTDIALOG = {};
 require('./services/asr').subscribeRecognize();
 require('./services/asr').subscribeRecognizeResult();
 // require('./services/asr').subscribeViewTimeAsr();
+// require('./services/asr').testSpeech();

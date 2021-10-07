@@ -6,12 +6,14 @@ const { logger } = require('../utils/logger');
 // eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, next) {
   logger.error(err);
-  let statusCode = err.code;
+  let statusCode = err.code || err.statusCode;
   let { message } = err;
-  const code = err.code || statusCodes.INTERNAL_SERVER_ERROR;
+  let details;
+  const code = err.code || err.statusCode || statusCodes.INTERNAL_SERVER_ERROR;
   switch (code) {
     case statusCodes.BAD_REQUEST:
       message = message || 'Bad Request';
+      details = err.details;
       break;
     case statusCodes.UNAUTHORIZED:
       message = 'Unauthorized';
@@ -37,6 +39,7 @@ function errorHandler(err, req, res, next) {
             status: 0,
             code,
             message,
+            details,
           }
         : {
             status: 0,

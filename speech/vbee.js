@@ -27,57 +27,33 @@ function VbeeSpeech({ sessionId, uuid, recognizeModel, apiKey }) {
   this.uuid = uuid;
   this.lastText = 'Im lặng';
   this.provider = PROVIDER.VBEE;
+  this.recognizeModel = recognizeModel;
 
   // variable
   const request = {
-    streaming_request: {
-      model: 'Wav2vec2',
-      record: false,
-      partial_results: true,
-      single_utterance: true,
-      interim_results: false,
-      config: {
-        encoding: 1,
-        max_alternatives: 1,
-        session_id: uuid,
-        sample_rate_hertz: 8000,
-        speech_contexts: [
-          {
-            phrases: [],
-          },
-        ],
-        model_param: {
-          graph: recognizeModel || 'general',
+    config: {
+      specification: {
+        model: 'Wav2vec2',
+        record: false,
+        partial_results: true,
+        single_utterance: true,
+        interim_results: false,
+        config_audio: {
+          encoding: 1,
+          max_alternatives: 1,
+          session_id: uuid,
+          sample_rate_hertz: 8000,
         },
       },
     },
   };
-  // const request = {
-  //   streaming_config: {
-  //     model: 'Wav2vec2',
-  //     single_utterance: true,
-  //     interim_results: true,
-  //     partial_results: true,
-  //     config: {
-  //       encoding: 1,
-  //       max_alternatives: 1,
-  //       session_id: uuid,
-  //       sample_rate_hertz: 8000,
-  //       speech_contexts: [
-  //         {
-  //           phrases: [],
-  //         },
-  //       ],
-  //       model_param: {
-  //         graph: recognizeModel || 'general',
-  //       },
-  //     },
-  //   },
-  // };
   this.startRecognitionStream({ request, apiKey: apiKey || API_KEY_DEFAULT });
 }
 
-VbeeSpeech.prototype.startRecognitionStream = function({ request, apiKey }) {
+VbeeSpeech.prototype.startRecognitionStream = function({
+  request,
+  apiKey = API_KEY_DEFAULT,
+}) {
   const endpoint = '0.tcp.ngrok.io:16055';
   logger.info('endpoint', endpoint);
 
@@ -85,7 +61,7 @@ VbeeSpeech.prototype.startRecognitionStream = function({ request, apiKey }) {
     endpoint,
     grpc.credentials.createInsecure(),
   );
-  logger.info('apiKey', apiKey);
+  logger.info('apiKey', apiKey || API_KEY_DEFAULT);
   const meta = new grpc.Metadata();
   meta.add('api-key', apiKey);
 
@@ -94,7 +70,7 @@ VbeeSpeech.prototype.startRecognitionStream = function({ request, apiKey }) {
     .StreamingRecognize(meta)
     .on('data', function(data) {
       logger.warn('[VbeeSpeech][Transcription] data: ', JSON.stringify(data));
-      const { text, final } = data;
+      const { text, is_final: final } = data;
       // send publish data
       publisher.publishAsync(
         REDIS_QUEUE_NAME.REDIS_QUEUE_RECOGNIZE_RESULT,
@@ -128,8 +104,12 @@ VbeeSpeech.prototype.startRecognitionStream = function({ request, apiKey }) {
   this.recognizeStream.write(request);
 };
 
-VbeeSpeech.prototype.stopRecognitionStream = function() {
-  logger.info('[VbeeSpeech][stopRecognitionStream] stop recognition stream');
+VbeeSpeech.prototype.stopRecognitionStream = function(reson) {
+  logger.info(
+    '[VbeeSpeech][stopRecognitionStream] stop recognition stream: ',
+    this.uuid,
+    reson,
+  );
   this.isStopRecognize = true;
   if (this.recognizeStream) {
     this.recognizeStream.end();
@@ -139,7 +119,7 @@ VbeeSpeech.prototype.stopRecognitionStream = function() {
   setTimeout(() => {
     logger.info(
       this.sessionId,
-      `[VbeeSpeech][stopRecognitionStream] auto close timeout`,
+      `[VbeeSpeech][stopRecognitionStream] auto close timeout ${this.uuid}`,
     );
     // send publish data
     publisher.publishAsync(
@@ -157,7 +137,7 @@ VbeeSpeech.prototype.stopRecognitionStream = function() {
 
 VbeeSpeech.prototype.receiveByteData = function({ uuid, bytes }) {
   this.uuid = uuid;
-  if (this.recognizeStream && !this.isStopRecognize) {
+  if (this.recognizeStream) {
     try {
       logger.info(
         `[VbeeSpeech][receiveByteData] receive bytes data ${bytes.length}`,

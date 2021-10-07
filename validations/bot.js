@@ -18,7 +18,9 @@ const initBot = {
 };
 
 const closeBot = {
-  query: Joi.object({}),
+  query: Joi.object({
+    sessionIdLua: Joi.string().required(),
+  }),
 };
 
 module.exports = {

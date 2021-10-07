@@ -1,9 +1,12 @@
 /* eslint-disable func-names */
 const uuid = require('uuid');
 const moment = require('moment-timezone');
+const snakecaseKeys = require('snakecase-keys');
 const WebSocketClient = require('websocket').client;
 
 const { logger } = require('../utils/logger');
+const { updateWorkflowAicc } = require('../utils/speech');
+const { httpPOST } = require('../utils/utils');
 const { PROVIDER, VERSION_CHAT } = require('../constants');
 
 const WS_ENDPOINT =
@@ -19,18 +22,19 @@ function VbeeSmartdialog({
   callbackFunction,
   accessToken = '',
   sessionId,
+  uuid,
   requestId,
   updateWorkflowUrl,
 }) {
-  this.sessionId = sessionId; // uuid id lua
-  this.clientId = ''; // session id ~ client id
+  this.uuid = uuid;
+  this.sessionId = sessionId;
   this.requestId = requestId;
   this.updateWorkflowUrl = updateWorkflowUrl;
   this.appId = appId;
   this.endpoint = endpoint || WS_ENDPOINT;
   this.version = version;
   this.phoneNumber = phoneNumber;
-  this.textInit = textInit;
+  this.textInit = textInit || '';
   this.callbackFunction = callbackFunction;
   this.callbackUrl = callbackUrl;
   this.isSendInitRequest = false;
@@ -59,7 +63,7 @@ VbeeSmartdialog.prototype.connect = function() {
   this.client.on('connect', function(connection) {
     me.connection = connection;
     logger.info(
-      `[VbeeSmartdialog][connect] ${me.clientId} ws client connected`,
+      `[VbeeSmartdialog][connect] ${me.sessionId} ws client connected`,
     );
     // ping
     heartbeat(me, new Date().valueOf() / 1000);
@@ -76,15 +80,17 @@ VbeeSmartdialog.prototype.connect = function() {
     // event
     connection.on('error', function(error) {
       logger.error(
-        `[VbeeSmartdialog][conect error] client ${me.clientId} Connect Error: `,
+        `[VbeeSmartdialog][conect error] client ${
+          me.sessionId
+        } Connect Error: `,
         error.message,
       );
     });
 
     connection.on('close', function() {
       me.connection = null;
-      logger.error(
-        `[VbeeSmartdialog][conect error] client ${me.clientId} Connect Close`,
+      logger.warn(
+        `[VbeeSmartdialog][connect close] client ${me.sessionId} Connect Close`,
       );
     });
 
@@ -101,17 +107,17 @@ VbeeSmartdialog.prototype.connect = function() {
         if (!['PONG'].includes(type)) {
           logger.info(
             '[VbeeSmartdialog][message]',
-            me.clientId,
+            me.sessionId,
             message.utf8Data,
           );
         }
 
         if (type === 'INIT' && status === 1) {
           me.accessToken = accessToken;
-          if (me.callbackFunction && me.textInit.length > 0) {
+          if (me.callbackFunction && me.textInit > 0) {
             logger.info(
               `[VbeeSmartdialog][message] client Id ${
-                me.clientId
+                me.sessionId
               } send init text: ${me.textInit}`,
             );
           }
@@ -130,16 +136,64 @@ VbeeSmartdialog.prototype.connect = function() {
               asrBreakingTime: utf8Data.data.asr_breaking_time || 300,
             };
           });
+          const dataResult = snakecaseKeys(
+            {
+              error: 0,
+              listActions,
+              nlu: utf8Data.data.nlu || {},
+              transcript: me.currentTranscript,
+            },
+            { deep: true },
+          );
           logger.info(
-            `[VbeeSmartdialog][message] clientId ${
-              me.clientId
+            `[VbeeSmartdialog][message] sessionId ${
+              me.sessionId
             } chat list actions ${JSON.stringify(listActions)}`,
           );
 
           if (me.callbackFunction) {
             // init
+            if (me.requestId && me.updateWorkflowUrl) {
+              // update logs workflow aicallcenter
+              const body = snakecaseKeys(
+                {
+                  error: 0,
+                  requestId: me.requestId,
+                  actions: listActions,
+                  entities: utf8Data.data.nlu.entities || {},
+                  intent: utf8Data.data.nlu.intent || {},
+                  userSay: me.currentTranscript,
+                  asrProcessTime: 0,
+                  botProcessTime: 0,
+                  asrAt: me.asrAt,
+                },
+                { deep: true },
+              );
+              logger.info(
+                '[VbeeSmartdialog][message] update result to aicallcenter params',
+                JSON.stringify(body),
+              );
+              httpPOST({ url: me.updateWorkflowUrl, body }).then(res => {
+                logger.info(
+                  '[VbeeSmartdialog][message] update result to aicallcenter result',
+                  JSON.stringify(res),
+                );
+              });
+            }
+
+            me.isSendInitRequest = true;
+
+            switch (me.version) {
+              case VERSION_CHAT['VER1.1']:
+                me.callbackFunction(listActions[0].content);
+                break;
+              default:
+                me.callbackFunction(dataResult, utf8Data.data.session_id);
+                break;
+            }
           } else {
             // send text to client
+            updateWorkflowAicc(me.sessionId, JSON.stringify(dataResult));
           }
         }
       }
@@ -181,7 +235,7 @@ VbeeSmartdialog.prototype.send = function(data) {
   if (this.connection) {
     logger.info(
       `[VbeeSmartdialog][send] client ${
-        this.clientId
+        this.sessionId
       } send message ${JSON.stringify(data)}`,
     );
 
@@ -192,7 +246,7 @@ VbeeSmartdialog.prototype.send = function(data) {
 };
 
 VbeeSmartdialog.prototype.sendMessage = function(text) {
-  this.currentMessage = text;
+  this.currentTranscript = text;
   this.send({
     type: 'CHAT',
     access_token: this.accessToken,

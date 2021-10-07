@@ -23,8 +23,8 @@ message RecognitionSpec {
   bool record = 2;
   bool partial_results = 3;
   bool single_utterance = 4;
-  bool raw_results = 5;
-  bool save_audio = 6;
+  bool interim_results = 5;
+  Config config_audio = 6;
 }
 
 message RecognitionResponse {
@@ -34,16 +34,23 @@ message RecognitionResponse {
 
 message StreamingRecognitionResponse {
   string text = 1;
-  bool final = 2;
+  bool is_final = 2;
 }
 
 message SpeechRecognitionChunk {
   repeated SpeechRecognitionAlternative alternatives = 1;
-  bool final = 2;
+  bool is_final = 2;
   bool end_of_utterance = 3;
 }
 
 message SpeechRecognitionAlternative {
   string text = 1;
   float confidence = 2;
+}
+
+message Config {
+  string encoding = 1;
+  string max_alternatives = 2;
+  string session_id = 3;
+  int32 sample_rate_hertz = 4;
 }

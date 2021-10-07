@@ -29,6 +29,7 @@ function VaisSpeech({ sessionId, uuid, recognizeModel, apiKey }) {
   this.sessionId = sessionId;
   this.uuid = uuid;
   this.lastText = 'Im lặng';
+  this.recognizeModel = recognizeModel;
 
   // variable
   const request = {
@@ -140,7 +141,7 @@ VaisSpeech.prototype.stopRecognitionStream = function() {
 
 VaisSpeech.prototype.receiveByteData = function({ uuid, bytes }) {
   this.uuid = uuid;
-  if (this.recognizeStream && !this.isStopRecognize) {
+  if (this.recognizeStream) {
     try {
       logger.info(
         `[VaisSpeech][receiveByteData] receive bytes data ${bytes.length}`,

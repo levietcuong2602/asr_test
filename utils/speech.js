@@ -1,3 +1,5 @@
+const snakecaseKeys = require('snakecase-keys');
+
 const { httpGET, httpPOST } = require('./utils');
 const { logger } = require('./logger');
 
@@ -8,9 +10,10 @@ const {
 } = process.env;
 
 const stopRecognizeTimeout = (speech, timeout) => {
-  if (speech) return null;
+  if (!speech) return null;
   return setTimeout(() => {
-    speech.stopRecognizeTimeout();
+    logger.info('[stopRecognizeTimeout] stop recognize Timeout');
+    speech.stopRecognitionStream('stop recognize Timeout');
   }, timeout);
 };
 
@@ -71,4 +74,62 @@ const correctAsrRequest = async body => {
   return '';
 };
 
-module.exports = { stopRecognizeTimeout, predictResult, correctAsrRequest };
+const updateWorkflowAicc = async (sessionId, data) => {
+  try {
+    const speech = MAPING_REQUEST_SPEECH[sessionId];
+    if (speech) {
+      const { requestId, updateWorflowUrl } = speech;
+      speech.endTimeBotProcess = Math.floor(new Date().valueOf() / 1000);
+
+      let jsonData = JSON.parse(data);
+      jsonData = snakecaseKeys(
+        {
+          ...jsonData,
+          sttProcessTime: speech.endTimeProcess - speech.startTimeProcess,
+          botProcessTime: speech.endTimeBotProcess - speech.startTimeBotProcess,
+        },
+        { deep: true },
+      );
+      if (requestId && updateWorflowUrl) {
+        const body = snakecaseKeys(
+          {
+            error: 0,
+            requestId,
+            actions: jsonData.list_actions,
+            entities: jsonData.nlu.entities || {},
+            intent: jsonData.nlu.intent || {},
+            userSay: jsonData.transcript,
+            asrProcessTime: jsonData.stt_process_time,
+            botProcessTime: jsonData.bot_process_time,
+            asrAt: speech.asrAt,
+          },
+          { deep: true },
+        );
+        logger.info(
+          '[updateWorkflowAicc] update workflow aicallcenter params',
+          speech.updateWorflowUrl,
+          JSON.stringify(body),
+        );
+
+        httpPOST({ url: speech.updateWorflowUrl, body }).then(res => {
+          logger.info(
+            '[updateWorkflowAicc] update workflow aicallcenter result',
+            res,
+          );
+        });
+      }
+
+      data = JSON.stringify(jsonData);
+    }
+  } catch (error) {
+    logger.error('[updateWorkflowAicc] error: ', error.message);
+  }
+  // TODO pub/sub channel redis return pub
+};
+
+module.exports = {
+  stopRecognizeTimeout,
+  predictResult,
+  correctAsrRequest,
+  updateWorkflowAicc,
+};

@@ -28,36 +28,36 @@ const subRecognizeResult = require('../utils/redis').subscriber();
 const subViewTimeAsr = require('../utils/redis').subscriber();
 
 const testSpeech = () => {
-  const test = ServiceSpeech(PROVIDER.VBEE);
+  const test = ServiceSpeech(PROVIDER.VBEE)({});
 
-  const audioDataStream = fs.createReadStream('./audio_237.wav', {
-    highWaterMark: 320,
-  });
+  // const audioDataStream = fs.createReadStream('./audio_237.wav', {
+  //   highWaterMark: 320,
+  // });
 
-  audioDataStream.on('data', chunk => {
-    test.recognizeStream.write({ audio_content: chunk });
-  });
+  // audioDataStream.on('data', chunk => {
+  //   test.recognizeStream.write({ audio_content: chunk });
+  // });
 
-  audioDataStream.on('end', () => {
-    test.recognizeStream.end();
-  });
-
-  // fs.readFile("./test_01.raw", function (err, data) {
-  //   if (err) throw err;
-  //   let count = 0;
-  //   const chunkSize = 640;
-  //   for (var i = 0; i < data.length; i += chunkSize) {
-  //     buffer = data.slice(i, Math.min(i + chunkSize, data.length));
-  //     request = {
-  //       audio_content: buffer,
-  //     };
-  //     count += 1;
-
-  //     test.recognizeStream.write(request);
-  //   }
-  //  logger.info("count", count);
+  // audioDataStream.on('end', () => {
   //   test.recognizeStream.end();
   // });
+
+  fs.readFile('./test_01.raw', function(err, data) {
+    if (err) throw err;
+    let count = 0;
+    const chunkSize = 640;
+    for (var i = 0; i < data.length; i += chunkSize) {
+      buffer = data.slice(i, Math.min(i + chunkSize, data.length));
+      request = {
+        audio_content: buffer,
+      };
+      count += 1;
+
+      test.recognizeStream.write(request);
+    }
+    logger.info('count', count);
+    test.recognizeStream.end();
+  });
 };
 
 const subscribeViewTimeAsr = () => {
@@ -82,7 +82,7 @@ const subscribeRecognizeResult = () => {
       MAPING_REQUEST_SPEECH[`speech_backup_${sessionId}`] || null;
     const smartdialog = MAPING_REQUEST_SMARTDIALOG[uuid] || null;
 
-    if (speech) return;
+    if (!speech) return;
     // check 2s mà nội dung không thay đổi thì ngắt
     if (!isFinal && text) {
       const currentTime = Math.floor(new Date().valueOf() / 1000);
@@ -115,7 +115,9 @@ const subscribeRecognizeResult = () => {
         if (recognizeTimeoutId) {
           clearTimeout(recognizeTimeoutId);
         }
-        speech.stopRecognitionStream();
+        speech.stopRecognitionStream(
+          'stop recognize because text not change after 2s',
+        );
       }
 
       if (lastTimeTextChange || lastText !== text) {
@@ -153,15 +155,18 @@ const subscribeRecognizeResult = () => {
     );
 
     if (speech) {
-      speech.stopRecognitionStream();
+      speech.stopRecognitionStream('final=true speech stop recognize');
     }
     if (speechBackup) {
-      speechBackup.stopRecognitionStream();
+      speechBackup.stopRecognitionStream(
+        'final=true speechBackup stop recognize',
+      );
     }
 
     // TODO check silent
 
     // evaluate result recognize
+    if (!smartdialog) return;
     if (
       text.toLowerCase() === 'im lặng' &&
       speech.lastText.toLowerCase() !== 'im lặng'
@@ -216,7 +221,7 @@ const subscribeRecognizeResult = () => {
 
 const subscribeRecognize = () => {
   subRecognize.on('message', function(channel, message) {
-    const buffer = new Buffer(message, 'base64');
+    const buffer = new Buffer.from(message, 'base64');
     const { len_config: configLength, config } = ipHeader.parse(buffer);
     const {
       state,
@@ -288,10 +293,11 @@ const subscribeRecognize = () => {
         RECOGNIZE_STATE.DETECT_SILENT,
         RECOGNIZE_STATE.DETECT_NO_INPUT,
         RECOGNIZE_STATE.DETECT_RECOGNIZE_TIMEOUT,
-      ].includes(~~state)
+      ].includes(~~state) &&
+      !speech.isStopRecognize
     ) {
       // stop recognize
-      speech.stopRecognitionStream();
+      speech.stopRecognitionStream(`state=${state} speech stop recognize`);
     }
 
     // speech backup
@@ -302,10 +308,13 @@ const subscribeRecognize = () => {
           RECOGNIZE_STATE.DETECT_SILENT,
           RECOGNIZE_STATE.DETECT_NO_INPUT,
           RECOGNIZE_STATE.DETECT_RECOGNIZE_TIMEOUT,
-        ].includes(~~state)
+        ].includes(~~state) &&
+        !speechBackup.isStopRecognize
       ) {
         // stop recognize
-        speechBackup.stopRecognitionStream();
+        speechBackup.stopRecognitionStream(
+          `state=${state} speechBackup stop recognize`,
+        );
       }
     }
   });

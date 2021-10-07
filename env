@@ -1,0 +1,18 @@
+PORT=
+
+# vbee
+VBEE_ENDPOINT=
+
+# vais
+VAIS_ENDPOINT=
+
+# redis
+REDIS_HOST=
+REDIS_PORT=
+
+# predict
+PREDICT_DOMAIN=
+ACCESS_TOKEN_PREDICT=
+
+# asr
+ASR_CORRECT_DOMAIN=

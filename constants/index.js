@@ -18,6 +18,7 @@ const REDIS_QUEUE_NAME = {
 
 const VERSION_CHAT = {
   'VER1.1': '1.1',
+  'VER1.2': '1.2',
 };
 
 const REDIS_KEYS = {

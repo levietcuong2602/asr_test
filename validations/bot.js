@@ -10,7 +10,7 @@ const initBot = {
     appId: Joi.string().required(),
     endPoint: Joi.string().required(),
     callbackUrl: Joi.string(),
-    version: Joi.string().default(VERSION_CHAT),
+    version: Joi.string().default(VERSION_CHAT['VER1.1']),
     phoneNumber: Joi.string(),
     updateWorkflowUrl: Joi.string(),
     requestId: Joi.string(),

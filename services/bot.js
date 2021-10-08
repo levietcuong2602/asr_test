@@ -14,6 +14,7 @@ const initBot = async ({
   phoneNumber,
   updateWorkflowUrl,
   requestId,
+  callback,
 }) => {
   logger.info(
     '[bot][initBot] request init bot: ',
@@ -41,9 +42,7 @@ const initBot = async ({
     appId,
     endpoint: endPoint,
     textInit: text,
-    callbackFunction: (data, sessionId) => {
-      result = { ...data, sessionId };
-    },
+    callbackFunction: callback,
     callbackUrl,
     version,
     phoneNumber,
@@ -55,7 +54,6 @@ const initBot = async ({
   // save speech into varivale global
   // eslint-disable-next-line no-undef
   saveVariableGlobal(MAPING_REQUEST_SMARTDIALOG, sessionIdLua, smartdialog);
-  return result;
 };
 
 const closeBot = async ({ sessionIdLua }) => {

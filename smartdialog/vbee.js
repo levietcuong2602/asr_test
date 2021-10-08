@@ -114,12 +114,13 @@ VbeeSmartdialog.prototype.connect = function() {
 
         if (type === 'INIT' && status === 1) {
           me.accessToken = accessToken;
-          if (me.callbackFunction && me.textInit > 0) {
+          if (me.callbackFunction && me.textInit) {
             logger.info(
-              `[VbeeSmartdialog][message] client Id ${
+              `[VbeeSmartdialog][INIT] client Id ${
                 me.sessionId
               } send init text: ${me.textInit}`,
             );
+            me.sendMessage(me.textInit);
           }
         }
 
@@ -146,7 +147,7 @@ VbeeSmartdialog.prototype.connect = function() {
             { deep: true },
           );
           logger.info(
-            `[VbeeSmartdialog][message] sessionId ${
+            `[VbeeSmartdialog][CHAT] sessionId ${
               me.sessionId
             } chat list actions ${JSON.stringify(listActions)}`,
           );
@@ -170,12 +171,12 @@ VbeeSmartdialog.prototype.connect = function() {
                 { deep: true },
               );
               logger.info(
-                '[VbeeSmartdialog][message] update result to aicallcenter params',
+                '[VbeeSmartdialog][CHAT] update result to aicallcenter params',
                 JSON.stringify(body),
               );
               httpPOST({ url: me.updateWorkflowUrl, body }).then(res => {
                 logger.info(
-                  '[VbeeSmartdialog][message] update result to aicallcenter result',
+                  '[VbeeSmartdialog][CHAT] update result to aicallcenter result',
                   JSON.stringify(res),
                 );
               });
@@ -189,6 +190,8 @@ VbeeSmartdialog.prototype.connect = function() {
                 break;
               default:
                 me.callbackFunction(dataResult, utf8Data.data.session_id);
+                me.callbackFunction = null;
+                me.textInit = '';
                 break;
             }
           } else {

@@ -22,9 +22,10 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 
 const speech = grpc.loadPackageDefinition(packageDefinition).vbee.stt.v1;
 
-function VbeeSpeech({ sessionId, uuid, recognizeModel, apiKey }) {
+function VbeeSpeech({ sessionId, uuid, recognizeModel, apiKey, requestId }) {
   this.sessionId = sessionId;
   this.uuid = uuid;
+  this.requestId = requestId;
   this.lastText = 'Im lặng';
   this.provider = PROVIDER.VBEE;
   this.recognizeModel = recognizeModel;

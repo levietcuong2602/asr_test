@@ -76,6 +76,7 @@ const correctAsrRequest = async body => {
 
 const updateWorkflowAicc = async (sessionId, data) => {
   try {
+    // eslint-disable-next-line no-undef
     const speech = MAPING_REQUEST_SPEECH[sessionId];
     if (speech) {
       const { requestId, updateWorflowUrl } = speech;

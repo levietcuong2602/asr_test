@@ -1,8 +1,8 @@
 /* eslint-disable no-undef */
 /* eslint-disable no-bitwise */
-/* eslint-disable no-buffer-constructor */
 /* eslint-disable func-names */
 const fs = require('fs');
+const moment = require('moment-timezone');
 
 const { ServiceSpeech } = require('../speech');
 const { VbeeSmartdialog } = require('../smartdialog/vbee');
@@ -63,7 +63,7 @@ const testSpeech = () => {
 const subscribeViewTimeAsr = () => {
   subViewTimeAsr.on('message', function(channel, message) {
     logger.info('subscribeViewTimeAsr', JSON.stringify(message));
-    const data = new Buffer(message, 'base64');
+    const data = Buffer.from(message, 'base64');
   });
   subViewTimeAsr.subscribe('list_time_process_asr');
 };
@@ -221,7 +221,7 @@ const subscribeRecognizeResult = () => {
 
 const subscribeRecognize = () => {
   subRecognize.on('message', function(channel, message) {
-    const buffer = new Buffer.from(message, 'base64');
+    const buffer = Buffer.from(message, 'base64');
     const { len_config: configLength, config } = ipHeader.parse(buffer);
     const {
       state,
@@ -255,6 +255,7 @@ const subscribeRecognize = () => {
         uuid: sessionIdLua,
         recognizeModel,
         apiKey,
+        requestId,
       });
       // save speech into varivale global
       saveVariableGlobal(MAPING_REQUEST_SPEECH, sessionId, speech);
@@ -270,6 +271,7 @@ const subscribeRecognize = () => {
           uuid: sessionIdLua,
           recognizeModel,
           apiKey,
+          requestId,
         });
         // save speech into varivale global
         saveVariableGlobal(
@@ -278,11 +280,18 @@ const subscribeRecognize = () => {
           speechBackup,
         );
       }
+
+      // set start time process asr
+      speech.startTimeProcess = Math.floor(new Date().valueOf() / 1000);
     }
 
     if (smartdialog) {
       smartdialog.requestId = requestId;
-      smartdialog.clientId = sessionId;
+      smartdialog.sessionId = sessionId;
+      smartdialog.uuid = uuid;
+
+      speech.updateWorkflowUrl = smartdialog.updateWorkflowUrl;
+      speech.asrAt = moment.tz(moment(), 'Asia/Ho_Chi_Minh').format();
     }
 
     const bytes = buffer.slice(8 + configLength);

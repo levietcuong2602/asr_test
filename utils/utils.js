@@ -28,7 +28,7 @@ const httpGET = async ({
       .get(url, { params, headers })
       .then(res => res.text())
       .catch(err => {
-        console.log(err.message);
+        logger.error(err.message);
         return '';
       });
     return data;
@@ -47,7 +47,7 @@ const httpPOST = async ({
       .post(url, body, { headers })
       .then(res => res.json())
       .catch(err => {
-        console.log(err.message);
+        logger.error(err.message);
         return '';
       });
     return data;

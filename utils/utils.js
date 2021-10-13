@@ -6,7 +6,9 @@ const cleanGarbageTimeout = (variable, field) => {
   setTimeout(() => {
     delete variable[field];
     logger.warn(
-      `[cleanGarbageTimeout] delete field ${field} of variable ${variable}`,
+      `[cleanGarbageTimeout] delete field ${field} of variable ${JSON.stringify(
+        variable,
+      )}`,
     );
   }, 10 * 60 * 1000);
 };

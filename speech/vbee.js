@@ -2,7 +2,6 @@
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 const path = require('path');
-const _ = require('lodash');
 
 require('dotenv').config();
 const { logger } = require('../utils/logger');

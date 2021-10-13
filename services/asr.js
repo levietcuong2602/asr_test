@@ -58,6 +58,9 @@ const testSpeech = () => {
   //   logger.info('count', count);
   //   test.recognizeStream.end();
   // });
+
+  logger.info('[test] set variable');
+  saveVariableGlobal(MAPING_REQUEST_SPEECH, 'abc', '123');
 };
 
 const subscribeViewTimeAsr = () => {

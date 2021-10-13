@@ -83,6 +83,7 @@ const subscribeRecognizeResult = () => {
     const speech = MAPING_REQUEST_SPEECH[sessionId] || null;
     const speechBackup =
       MAPING_REQUEST_SPEECH[`speech_backup_${sessionId}`] || null;
+    const speechLab = MAPING_REQUEST_SPEECH[`speech_lab_${sessionId}`] || null;
     const smartdialog = MAPING_REQUEST_SMARTDIALOG[uuid] || null;
 
     if (!speech) return;
@@ -164,6 +165,9 @@ const subscribeRecognizeResult = () => {
       speechBackup.stopRecognitionStream(
         'final=true speechBackup stop recognize',
       );
+    }
+    if (speechLab) {
+      speechLab.stopRecognitionStream('final=true speechLab stop recognize');
     }
 
     // TODO check silent
@@ -250,6 +254,7 @@ const subscribeRecognize = () => {
     let speech = MAPING_REQUEST_SPEECH[sessionId] || null;
     let speechBackup =
       MAPING_REQUEST_SPEECH[`speech_backup_${sessionId}`] || null;
+    let speechLab = MAPING_REQUEST_SPEECH[`speech_lab_${sessionId}`] || null;
     const smartdialog = MAPING_REQUEST_SMARTDIALOG[sessionIdLua] || null;
 
     if (!speech) {
@@ -268,8 +273,9 @@ const subscribeRecognize = () => {
       // settimout stop recognize
       speech.recognizeTimeoutId = stopRecognizeTimeout(speech, 6000);
 
+      // stream backup
       if (providerBackup) {
-        speechBackup = ServiceSpeech(provider)({
+        speechBackup = ServiceSpeech(providerBackup)({
           sessionId,
           uuid: sessionIdLua,
           recognizeModel,
@@ -286,6 +292,21 @@ const subscribeRecognize = () => {
 
       // set start time process asr
       speech.startTimeProcess = Math.floor(new Date().valueOf() / 1000);
+    }
+    if (!speechLab) {
+      // stream logs
+      speechLab = ServiceSpeech(PROVIDER.LAB)({
+        sessionId,
+        uuid: sessionIdLua,
+        recognizeModel,
+        apiKey,
+        requestId,
+      });
+      saveVariableGlobal(
+        MAPING_REQUEST_SPEECH,
+        `speech_lab_${sessionId}`,
+        speechLab,
+      );
     }
 
     if (smartdialog) {
@@ -326,6 +347,24 @@ const subscribeRecognize = () => {
         // stop recognize
         speechBackup.stopRecognitionStream(
           `state=${state} speechBackup stop recognize`,
+        );
+      }
+    }
+
+    // speech lab
+    if (speechLab) {
+      speechLab.receiveByteData({ uuid: sessionIdLua, bytes });
+      if (
+        [
+          RECOGNIZE_STATE.DETECT_SILENT,
+          RECOGNIZE_STATE.DETECT_NO_INPUT,
+          RECOGNIZE_STATE.DETECT_RECOGNIZE_TIMEOUT,
+        ].includes(~~state) &&
+        !speechLab.isStopRecognize
+      ) {
+        // stop recognize
+        speechLab.stopRecognitionStream(
+          `state=${state} speechLab stop recognize`,
         );
       }
     }

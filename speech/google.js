@@ -6,7 +6,7 @@ require('dotenv').config();
 
 const { logger } = require('../utils/logger');
 const { publisher } = require('../utils/redis');
-const { REDIS_QUEUE_NAME } = require('../constants');
+const { REDIS_QUEUE_NAME, PROVIDER } = require('../constants');
 
 const client = new speech.SpeechClient({
   keyFilename: path.join(__dirname, '../configs/credential_google.json'),
@@ -17,6 +17,7 @@ function GoogleSpeech({ sessionId, uuid, recognizeModel }) {
   this.uuid = uuid;
   this.isStopRecognize = false;
   this.lastText = 'Im lặng';
+  this.provider = PROVIDER.GOOGLE;
 
   // variable
   const request = {
@@ -34,6 +35,7 @@ function GoogleSpeech({ sessionId, uuid, recognizeModel }) {
 }
 
 GoogleSpeech.prototype.startRecognitionStream = function({ request }) {
+  const me = this;
   this.recognizeStream = client
     .streamingRecognize(request)
     .on('error', err => {
@@ -67,16 +69,18 @@ GoogleSpeech.prototype.startRecognitionStream = function({ request }) {
       publisher.publishAsync(
         REDIS_QUEUE_NAME.REDIS_QUEUE_RECOGNIZE_RESULT,
         JSON.stringify({
-          sessionId: this.sessionId,
-          uuid: this.uuid,
+          sessionId: me.sessionId,
+          uuid: me.uuid,
           isFinal,
           text: transcript,
+          provider: me.provider,
         }),
       );
     })
     .on('end', function() {
       logger.info('[GoogleSpeech][Transcription] end');
       // stop recognize
+      me.stopRecognitionStream();
     });
 };
 

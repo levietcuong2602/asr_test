@@ -2,6 +2,7 @@ const PROVIDER = {
   VBEE: 'vbee',
   VAIS: 'vais',
   GOOGLE: 'google',
+  LAB: 'lab',
 };
 
 const RECOGNIZE_STATE = {

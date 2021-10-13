@@ -10,7 +10,7 @@ const { REDIS_QUEUE_NAME, PROVIDER } = require('../constants');
 
 const API_KEY_DEFAULT = '6FV9YwvcaSugKq6k';
 
-const PROTO_PATH = path.join(__dirname, '../lib/stt_vbee_service.proto');
+const PROTO_PATH = path.join(__dirname, '../lib/stt_lab_service.proto');
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
   keepCase: true,
   longs: String,
@@ -21,12 +21,12 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 
 const speech = grpc.loadPackageDefinition(packageDefinition).vbee.stt.v1;
 
-function VbeeSpeech({ sessionId, uuid, recognizeModel, apiKey, requestId }) {
+function LabSpeech({ sessionId, uuid, recognizeModel, apiKey, requestId }) {
   this.sessionId = sessionId;
   this.uuid = uuid;
   this.requestId = requestId;
   this.lastText = 'Im lặng';
-  this.provider = PROVIDER.VBEE;
+  this.provider = PROVIDER.LAB;
   this.recognizeModel = recognizeModel;
 
   // variable
@@ -36,8 +36,8 @@ function VbeeSpeech({ sessionId, uuid, recognizeModel, apiKey, requestId }) {
         model: 'Wav2vec2',
         record: false,
         partial_results: true,
-        single_utterance: true,
-        interim_results: true,
+        single_utterance: false,
+        interim_results: false,
         config_audio: {
           encoding: 1,
           max_alternatives: 1,
@@ -50,7 +50,7 @@ function VbeeSpeech({ sessionId, uuid, recognizeModel, apiKey, requestId }) {
   this.startRecognitionStream({ request, apiKey: apiKey || API_KEY_DEFAULT });
 }
 
-VbeeSpeech.prototype.startRecognitionStream = function({
+LabSpeech.prototype.startRecognitionStream = function({
   request,
   apiKey = API_KEY_DEFAULT,
 }) {
@@ -67,9 +67,9 @@ VbeeSpeech.prototype.startRecognitionStream = function({
 
   const me = this;
   this.recognizeStream = client
-    .StreamingRecognize(meta)
+    .LogRecognize(meta)
     .on('data', function(data) {
-      logger.warn('[VbeeSpeech][Transcription] data: ', JSON.stringify(data));
+      logger.warn('[LabSpeech][Transcription] data: ', JSON.stringify(data));
       const { text, is_final: final } = data;
       // send publish data
       publisher.publishAsync(
@@ -84,10 +84,10 @@ VbeeSpeech.prototype.startRecognitionStream = function({
       );
     })
     .on('error', function(err) {
-      logger.error('[VbeeSpeech][Transcription] error: ', err);
+      logger.error('[LabSpeech][Transcription] error: ', err);
     })
     .on('end', function() {
-      logger.info('[VbeeSpeech][Transcription] end');
+      logger.info('[LabSpeech][Transcription] end');
       // send publish data
       publisher.publishAsync(
         REDIS_QUEUE_NAME.REDIS_QUEUE_RECOGNIZE_RESULT,
@@ -104,9 +104,9 @@ VbeeSpeech.prototype.startRecognitionStream = function({
   this.recognizeStream.write(request);
 };
 
-VbeeSpeech.prototype.stopRecognitionStream = function(reson) {
+LabSpeech.prototype.stopRecognitionStream = function(reson) {
   logger.info(
-    '[VbeeSpeech][stopRecognitionStream] stop recognition stream: ',
+    '[LabSpeech][stopRecognitionStream] stop recognition stream: ',
     this.uuid,
     reson,
   );
@@ -119,7 +119,7 @@ VbeeSpeech.prototype.stopRecognitionStream = function(reson) {
   setTimeout(() => {
     logger.info(
       this.sessionId,
-      `[VbeeSpeech][stopRecognitionStream] auto close timeout ${this.uuid}`,
+      `[LabSpeech][stopRecognitionStream] auto close timeout ${this.uuid}`,
     );
     // send publish data
     publisher.publishAsync(
@@ -135,19 +135,19 @@ VbeeSpeech.prototype.stopRecognitionStream = function(reson) {
   }, 2 * 1000);
 };
 
-VbeeSpeech.prototype.receiveByteData = function({ uuid, bytes }) {
+LabSpeech.prototype.receiveByteData = function({ uuid, bytes }) {
   this.uuid = uuid;
   if (this.recognizeStream) {
     try {
       logger.info(
-        `[VbeeSpeech][receiveByteData] receive bytes data ${bytes.length}`,
+        `[LabSpeech][receiveByteData] receive bytes data ${bytes.length}`,
       );
       let xrequest = {
         audio_content: bytes,
       };
       if (bytes.length === 0) {
         logger.info(
-          '[VbeeSpeech][receiveByteData] length=0 Send done ++++++++++++++++++++',
+          '[LabSpeech][receiveByteData] length=0 Send done ++++++++++++++++++++',
         );
         xrequest = {
           audio_content: Buffer.from('DONE', 'utf8'),
@@ -157,7 +157,7 @@ VbeeSpeech.prototype.receiveByteData = function({ uuid, bytes }) {
       this.recognizeStream.write(xrequest);
     } catch (error) {
       logger.error(
-        '[VbeeSpeech][receiveByteData] receive bytes data error: ',
+        '[LabSpeech][receiveByteData] receive bytes data error: ',
         error.message,
       );
 
@@ -166,4 +166,4 @@ VbeeSpeech.prototype.receiveByteData = function({ uuid, bytes }) {
   }
 };
 
-module.exports = { VbeeSpeech };
+module.exports = { LabSpeech };

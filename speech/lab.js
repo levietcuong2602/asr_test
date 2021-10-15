@@ -115,24 +115,6 @@ LabSpeech.prototype.stopRecognitionStream = function(reson) {
     this.recognizeStream.end();
   }
   this.recognizeStream = null;
-
-  setTimeout(() => {
-    logger.info(
-      this.sessionId,
-      `[LabSpeech][stopRecognitionStream] auto close timeout ${this.uuid}`,
-    );
-    // send publish data
-    publisher.publishAsync(
-      REDIS_QUEUE_NAME.REDIS_QUEUE_RECOGNIZE_RESULT,
-      JSON.stringify({
-        sessionId: this.sessionId,
-        uuid: this.uuid,
-        isFinal: true,
-        text: this.lastText,
-        provider: this.provider,
-      }),
-    );
-  }, 2 * 1000);
 };
 
 LabSpeech.prototype.receiveByteData = function({ uuid, bytes }) {

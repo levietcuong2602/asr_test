@@ -5,13 +5,13 @@ const fs = require('fs');
 const moment = require('moment-timezone');
 
 const { ServiceSpeech } = require('../speech');
-const { VbeeSmartdialog } = require('../smartdialog/vbee');
 const { logger } = require('../utils/logger');
 const { ipHeader, getObjectFromConfigBuffer } = require('../utils/parser');
 const {
   stopRecognizeTimeout,
   predictResult,
   correctAsrRequest,
+  updateWorkflowAicc,
 } = require('../utils/speech');
 const { saveVariableGlobal } = require('../utils/utils');
 
@@ -28,20 +28,14 @@ const subRecognizeResult = require('../utils/redis').subscriber();
 const subViewTimeAsr = require('../utils/redis').subscriber();
 
 const testSpeech = () => {
-  const test = ServiceSpeech(PROVIDER.VBEE)({});
-
-  const audioDataStream = fs.createReadStream('./audio_237.wav', {
-    highWaterMark: 320,
-  });
-
-  audioDataStream.on('data', chunk => {
-    test.recognizeStream.write({ audio_content: chunk });
-  });
-
-  audioDataStream.on('end', () => {
-    test.recognizeStream.end();
-  });
-
+  // const test = ServiceSpeech(PROVIDER.VBEE)({});
+  // const audioDataStream = fs.createReadStream('./audio_237.wav');
+  // audioDataStream.on('data', chunk => {
+  //   test.recognizeStream.write({ audio_content: chunk });
+  // });
+  // audioDataStream.on('end', () => {
+  //   test.recognizeStream.end();
+  // });
   // fs.readFile('./test_01.raw', function(err, data) {
   //   if (err) throw err;
   //   let count = 0;
@@ -52,15 +46,15 @@ const testSpeech = () => {
   //       audio_content: buffer,
   //     };
   //     count += 1;
-
   //     test.recognizeStream.write(request);
   //   }
   //   logger.info('count', count);
   //   test.recognizeStream.end();
   // });
-
-  logger.info('[test] set variable');
-  saveVariableGlobal(MAPING_REQUEST_SPEECH, 'abc', '123');
+  // logger.info('[test] set variable');
+  // saveVariableGlobal(MAPING_REQUEST_SPEECH, 'abc', '123');
+  const data = 'abcd1234';
+  console.log(Buffer.from(data).toString('base64'));
 };
 
 const subscribeViewTimeAsr = () => {
@@ -85,6 +79,11 @@ const subscribeRecognizeResult = () => {
       MAPING_REQUEST_SPEECH[`speech_backup_${sessionId}`] || null;
     const speechLab = MAPING_REQUEST_SPEECH[`speech_lab_${sessionId}`] || null;
     const smartdialog = MAPING_REQUEST_SMARTDIALOG[uuid] || null;
+
+    if (speechLab && speechLab.provider === provider) {
+      speechLab.stopRecognitionStream('final=true speechLab stop recognize');
+      return;
+    }
 
     if (!speech) return;
     // check 2s mà nội dung không thay đổi thì ngắt
@@ -166,14 +165,11 @@ const subscribeRecognizeResult = () => {
         'final=true speechBackup stop recognize',
       );
     }
-    if (speechLab) {
-      speechLab.stopRecognitionStream('final=true speechLab stop recognize');
-    }
 
     // TODO check silent
 
     // evaluate result recognize
-    if (!smartdialog) return;
+    if (!smartdialog) return await updateWorkflowAicc({ sessionId, text });
     if (
       text.toLowerCase() === 'im lặng' &&
       speech.lastText.toLowerCase() !== 'im lặng'
@@ -194,6 +190,7 @@ const subscribeRecognizeResult = () => {
     const speechTextValid =
       speech.lastText && speech.lastText.toLowerCase() !== 'im lặng';
     const speechBackupTextValid =
+      speechBackup &&
       speechBackup.lastText &&
       speechBackup.lastText.toLowerCase() !== 'im lặng';
     if (
@@ -312,7 +309,7 @@ const subscribeRecognize = () => {
     if (smartdialog) {
       smartdialog.requestId = requestId;
       smartdialog.sessionId = sessionId;
-      smartdialog.uuid = uuid;
+      smartdialog.uuid = sessionIdLua;
 
       speech.updateWorkflowUrl = smartdialog.updateWorkflowUrl;
       speech.asrAt = moment.tz(moment(), 'Asia/Ho_Chi_Minh').format();

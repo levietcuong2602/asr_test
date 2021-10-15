@@ -182,18 +182,18 @@ VbeeSmartdialog.prototype.connect = function() {
               });
             }
 
-            me.isSendInitRequest = true;
-
             switch (me.version) {
               case VERSION_CHAT['VER1.1']:
                 me.callbackFunction(listActions[0].content);
                 break;
               default:
                 me.callbackFunction(dataResult, utf8Data.data.session_id);
-                me.callbackFunction = null;
-                me.textInit = '';
                 break;
             }
+
+            me.isSendInitRequest = true;
+            me.callbackFunction = null;
+            me.textInit = '';
           } else {
             // send text to client
             updateWorkflowAicc(me.sessionId, JSON.stringify(dataResult));

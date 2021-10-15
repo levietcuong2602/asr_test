@@ -1,7 +1,9 @@
 const snakecaseKeys = require('snakecase-keys');
 
+const { publisher } = require('./redis');
 const { httpGET, httpPOST } = require('./utils');
 const { logger } = require('./logger');
+const { REDIS_QUEUE_NAME } = require('../constants');
 
 const {
   ACCESS_TOKEN_PREDICT,
@@ -126,6 +128,16 @@ const updateWorkflowAicc = async (sessionId, data) => {
     logger.error('[updateWorkflowAicc] error: ', error.message);
   }
   // TODO pub/sub channel redis return pub
+  logger.info(
+    '[updateWorkflowAicc] Send to task_queue',
+    'task_queue',
+    `1|id${sessionId}|${data}`,
+    Buffer.from(`${sessionId}|${data.toLowerCase()}`).toString('base64'),
+  );
+  publisher.publishAsync(
+    REDIS_QUEUE_NAME.REDIS_QUEUE_RETURN_PUB,
+    Buffer.from(`${sessionId}|${data}`).toString('base64'),
+  );
 };
 
 module.exports = {

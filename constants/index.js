@@ -15,6 +15,7 @@ const RECOGNIZE_STATE = {
 const REDIS_QUEUE_NAME = {
   REDIS_QUEUE_RECOGNIZE: 'speech-gate-queue-convert-tts',
   REDIS_QUEUE_RECOGNIZE_RESULT: 'redis_queue_recognize_result',
+  REDIS_QUEUE_RETURN_PUB: 'channel_redis_return_pub',
 };
 
 const VERSION_CHAT = {

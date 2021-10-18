@@ -37,7 +37,6 @@ const initBot = async ({
     'EX',
     300,
   );
-  let result = null;
   const smartdialog = new VbeeSmartdialog({
     appId,
     endpoint: endPoint,
@@ -50,6 +49,7 @@ const initBot = async ({
     requestId,
     updateWorkflowUrl,
   });
+  smartdialog.phoneNumber = phoneNumber;
 
   // save speech into varivale global
   // eslint-disable-next-line no-undef

@@ -37,7 +37,7 @@ function VbeeSpeech({ sessionId, uuid, recognizeModel, apiKey, requestId }) {
         record: false,
         partial_results: true,
         single_utterance: true,
-        interim_results: true,
+        interim_results: false,
         config_audio: {
           encoding: 1,
           max_alternatives: 1,

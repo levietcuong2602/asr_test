@@ -123,22 +123,22 @@ const subscribeRecognizeResult = () => {
         );
       }
 
-      if (lastTimeTextChange || lastText !== text) {
+      if (!lastTimeTextChange || lastText !== text) {
         speech.lastTimeTextChange = currentTime;
       }
     }
 
-    if (speech && text.length > 0 && speech.provider === provider) {
+    if (text.length > 0 && speech.provider === provider) {
       speech.lastText = text;
     }
     if (speechBackup && text.length > 0 && speechBackup.provider === provider) {
       speechBackup.lastText = text;
     }
     // set timeout stop recognize after 2s
-    if (speech && speech.recognizeTimeoutId) {
+    if (speech.recognizeTimeoutId) {
       clearTimeout(speech.recognizeTimeoutId);
     }
-    if (speech && !isFinal) {
+    if (!isFinal) {
       speech.recognizeTimeoutId = stopRecognizeTimeout(speech, 2000);
     }
     if (!isFinal) return;
@@ -157,10 +157,12 @@ const subscribeRecognizeResult = () => {
       300,
     );
 
-    if (speech) {
-      speech.stopRecognitionStream('final=true speech stop recognize');
-    }
+    let lastTextProvider = speech.lastText || '';
+    speech.stopRecognitionStream('final=true speech stop recognize');
+
+    let lastTextProviderBackup = '';
     if (speechBackup) {
+      lastTextProviderBackup = speechBackup.lastText || '';
       speechBackup.stopRecognitionStream(
         'final=true speechBackup stop recognize',
       );
@@ -168,39 +170,40 @@ const subscribeRecognizeResult = () => {
 
     // TODO check silent
 
-    // evaluate result recognize
+    // not connect smartdialog
     if (!smartdialog) return await updateWorkflowAicc({ sessionId, text });
+    // evaluate result recognize
     if (
       text.toLowerCase() === 'im lặng' &&
-      speech.lastText.toLowerCase() !== 'im lặng'
+      lastTextProvider.toLowerCase() !== 'im lặng'
     ) {
-      text = speech.lastText;
+      text = lastTextProvider;
     }
     if (
       text.toLowerCase() === 'im lặng' &&
-      speechBackup.lastText.toLowerCase() !== 'im lặng'
+      lastTextProviderBackup.toLowerCase() !== 'im lặng'
     ) {
-      text = speechBackup.lastText;
+      text = lastTextProviderBackup;
     }
 
     logger.info(
       `[asr][subscribeRecognizeResult] ${sessionId} text info request predict`,
+      JSON.stringify([text, lastTextProvider, lastTextProviderBackup]),
     );
     const { recognizeModel } = speech;
     const speechTextValid =
-      speech.lastText && speech.lastText.toLowerCase() !== 'im lặng';
+      lastTextProvider && lastTextProvider.toLowerCase() !== 'im lặng';
     const speechBackupTextValid =
-      speechBackup &&
-      speechBackup.lastText &&
-      speechBackup.lastText.toLowerCase() !== 'im lặng';
+      lastTextProviderBackup &&
+      lastTextProviderBackup.toLowerCase() !== 'im lặng';
     if (
       ['yes_no'].includes(recognizeModel) &&
       speechTextValid &&
       speechBackupTextValid
     ) {
       const predict = await predictResult([
-        speechBackup.lastText,
-        speech.lastText,
+        lastTextProviderBackup,
+        lastTextProvider,
       ]);
       logger.info('[asr][subscribeRecognizeResult] predict result: ', predict);
       if (predict) {
@@ -271,7 +274,10 @@ const subscribeRecognize = () => {
       speech.recognizeTimeoutId = stopRecognizeTimeout(speech, 6000);
 
       // stream backup
-      if (providerBackup) {
+      if (
+        !speechBackup ||
+        (speechBackup && speechBackup.provider !== providerBackup)
+      ) {
         speechBackup = ServiceSpeech(providerBackup)({
           sessionId,
           uuid: sessionIdLua,
@@ -296,7 +302,7 @@ const subscribeRecognize = () => {
         sessionId,
         uuid: sessionIdLua,
         recognizeModel,
-        apiKey,
+        phoneNumber: smartdialog ? smartdialog.phoneNumber : '',
         requestId,
       });
       saveVariableGlobal(

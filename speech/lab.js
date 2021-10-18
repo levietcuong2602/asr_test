@@ -21,13 +21,20 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 
 const speech = grpc.loadPackageDefinition(packageDefinition).vbee.stt.v1;
 
-function LabSpeech({ sessionId, uuid, recognizeModel, apiKey, requestId }) {
+function LabSpeech({
+  sessionId,
+  uuid,
+  recognizeModel,
+  phoneNumber,
+  requestId,
+}) {
   this.sessionId = sessionId;
   this.uuid = uuid;
   this.requestId = requestId;
   this.lastText = 'Im lặng';
   this.provider = PROVIDER.LAB;
   this.recognizeModel = recognizeModel;
+  this.phoneNumber = phoneNumber;
 
   // variable
   const request = {
@@ -47,23 +54,25 @@ function LabSpeech({ sessionId, uuid, recognizeModel, apiKey, requestId }) {
       },
     },
   };
-  this.startRecognitionStream({ request, apiKey: apiKey || API_KEY_DEFAULT });
+  this.startRecognitionStream({ request, phoneNumber });
 }
 
 LabSpeech.prototype.startRecognitionStream = function({
   request,
-  apiKey = API_KEY_DEFAULT,
+  phoneNumber = '',
 }) {
-  const endpoint = '0.tcp.ngrok.io:16055';
-  logger.info('endpoint', endpoint);
-
+  const endpoint = '6.tcp.ngrok.io:12834';
   const client = new speech.SttService(
     endpoint,
     grpc.credentials.createInsecure(),
   );
-  logger.info('apiKey', apiKey || API_KEY_DEFAULT);
   const meta = new grpc.Metadata();
-  meta.add('api-key', apiKey);
+  meta.add('api-key', API_KEY_DEFAULT);
+  meta.add('phone', phoneNumber);
+  logger.info(
+    `[LabSpeech] metadata: `,
+    JSON.stringify({ apiKey: API_KEY_DEFAULT, phoneNumber }),
+  );
 
   const me = this;
   this.recognizeStream = client

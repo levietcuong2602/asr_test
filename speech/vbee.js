@@ -55,6 +55,7 @@ VbeeSpeech.prototype.startRecognitionStream = function({
   apiKey = API_KEY_DEFAULT,
 }) {
   const endpoint = '0.tcp.ngrok.io:16055';
+  // const endpoint = '18.142.155.215:6688';
   logger.info('endpoint', endpoint);
 
   const client = new speech.SttService(

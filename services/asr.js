@@ -28,14 +28,14 @@ const subRecognizeResult = require('../utils/redis').subscriber();
 const subViewTimeAsr = require('../utils/redis').subscriber();
 
 const testSpeech = () => {
-  // const test = ServiceSpeech(PROVIDER.VBEE)({});
-  // const audioDataStream = fs.createReadStream('./audio_237.wav');
-  // audioDataStream.on('data', chunk => {
-  //   test.recognizeStream.write({ audio_content: chunk });
-  // });
-  // audioDataStream.on('end', () => {
-  //   test.recognizeStream.end();
-  // });
+  const test = ServiceSpeech(PROVIDER.VBEE)({});
+  const audioDataStream = fs.createReadStream('./test.wav');
+  audioDataStream.on('data', chunk => {
+    test.receiveByteData({ bytes: chunk });
+  });
+  audioDataStream.on('end', () => {
+    test.stopRecognitionStream();
+  });
   // fs.readFile('./test_01.raw', function(err, data) {
   //   if (err) throw err;
   //   let count = 0;
@@ -53,8 +53,6 @@ const testSpeech = () => {
   // });
   // logger.info('[test] set variable');
   // saveVariableGlobal(MAPING_REQUEST_SPEECH, 'abc', '123');
-  const data = 'abcd1234';
-  console.log(Buffer.from(data).toString('base64'));
 };
 
 const subscribeViewTimeAsr = () => {
